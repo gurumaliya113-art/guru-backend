@@ -1,0 +1,1224 @@
+{
+  "users": {
+    "u_eyij9s7vmp0ta33r": {
+      "name": "efg",
+      "role": "teacher",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [
+        {
+          "id": "topper",
+          "name": "Topper",
+          "description": "Score 90%+ in a quiz",
+          "icon": "award",
+          "earned": false
+        },
+        {
+          "id": "fast-solver",
+          "name": "Fast Solver",
+          "description": "Complete under 10 min",
+          "icon": "zap",
+          "earned": false
+        },
+        {
+          "id": "accuracy-king",
+          "name": "Accuracy King",
+          "description": "85%+ accuracy over 5 quizzes",
+          "icon": "target",
+          "earned": false
+        },
+        {
+          "id": "streak-5",
+          "name": "5-Day Streak",
+          "description": "Study 5 days in a row",
+          "icon": "activity",
+          "earned": false
+        },
+        {
+          "id": "first-paper",
+          "name": "Paper Maker",
+          "description": "Generate your first paper",
+          "icon": "file-text",
+          "earned": false
+        }
+      ],
+      "rank": 142,
+      "isOnboarded": false
+    },
+    "u_v9ox4h70mp0ujjqz": {
+      "name": "bhyn",
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [
+        {
+          "id": "topper",
+          "name": "Topper",
+          "description": "Score 90%+ in a quiz",
+          "icon": "award",
+          "earned": false
+        },
+        {
+          "id": "fast-solver",
+          "name": "Fast Solver",
+          "description": "Complete under 10 min",
+          "icon": "zap",
+          "earned": false
+        },
+        {
+          "id": "accuracy-king",
+          "name": "Accuracy King",
+          "description": "85%+ accuracy over 5 quizzes",
+          "icon": "target",
+          "earned": false
+        },
+        {
+          "id": "streak-5",
+          "name": "5-Day Streak",
+          "description": "Study 5 days in a row",
+          "icon": "activity",
+          "earned": false
+        },
+        {
+          "id": "first-paper",
+          "name": "Paper Maker",
+          "description": "Generate your first paper",
+          "icon": "file-text",
+          "earned": false
+        }
+      ],
+      "rank": 142,
+      "isOnboarded": false
+    }
+  },
+  "attempts": {},
+  "papers": {
+    "u_v9ox4h70mp0ujjqz": [
+      {
+        "id": "1778780320676021pe",
+        "title": "JEE Physics — Electrostatics",
+        "examType": "JEE",
+        "subject": "Physics",
+        "topic": "Electrostatics",
+        "difficulty": "Moderate",
+        "questions": [
+          {
+            "id": "q2",
+            "subject": "Physics",
+            "topic": "Electrostatics",
+            "text": "A parallel plate capacitor has plate area 100 cm² and separation 2 mm. The capacitance is:",
+            "options": [
+              "4.43 pF",
+              "44.3 pF",
+              "0.443 pF",
+              "443 pF"
+            ],
+            "correctIndex": 0,
+            "explanation": "C = ε₀A/d = (8.85×10⁻¹²)(100×10⁻⁴)/(2×10⁻³) = 4.43 pF",
+            "difficulty": "Moderate",
+            "type": "MCQ",
+            "examType": [
+              "JEE"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q_16ebcb56",
+            "subject": "Physics",
+            "topic": "Thermodynamics",
+            "text": "azad ke 4 bche ghainb  jmnbb ",
+            "options": [
+              "errr",
+              "bbbbbbb",
+              "ftfvbhj",
+              "ddddddd"
+            ],
+            "correctIndex": 0,
+            "explanation": "",
+            "difficulty": "Hard",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2025,
+            "source": "manual",
+            "createdAt": "2026-05-11T07:53:04.730Z"
+          },
+          {
+            "id": "q1",
+            "subject": "Physics",
+            "topic": "Electrostatics",
+            "text": "Two point charges +4μC and -4μC are placed 20 cm apart. What is the electric potential at the midpoint?",
+            "options": [
+              "Zero",
+              "720 kV",
+              "-720 kV",
+              "360 kV"
+            ],
+            "correctIndex": 0,
+            "explanation": "At the midpoint, V = kq/r + k(-q)/r = 0. The potentials due to equal and opposite charges cancel.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q3",
+            "subject": "Physics",
+            "topic": "Thermodynamics",
+            "text": "In a Carnot cycle, the efficiency of the engine is 40%. If the heat rejected is 600 J, the work done by the engine is:",
+            "options": [
+              "400 J",
+              "240 J",
+              "600 J",
+              "1000 J"
+            ],
+            "correctIndex": 0,
+            "explanation": "Q_rejected = 600J, efficiency = 0.4. Q_absorbed = 1000J, W = 400J",
+            "difficulty": "Moderate",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "NEET"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q4",
+            "subject": "Physics",
+            "topic": "Optics",
+            "text": "A convex lens has focal length 20 cm. An object is placed 30 cm away. The image distance is:",
+            "options": [
+              "60 cm",
+              "-60 cm",
+              "30 cm",
+              "40 cm"
+            ],
+            "correctIndex": 0,
+            "explanation": "1/v - 1/u = 1/f → 1/v = 1/20 + 1/(-30) → v = 60 cm",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE",
+              "BOARD"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q5",
+            "subject": "Physics",
+            "topic": "Modern Physics",
+            "text": "The de Broglie wavelength of an electron moving with velocity v is λ. If the velocity is doubled, the wavelength becomes:",
+            "options": [
+              "λ/2",
+              "2λ",
+              "λ/4",
+              "4λ"
+            ],
+            "correctIndex": 0,
+            "explanation": "λ = h/mv. If v doubles, λ becomes h/(m·2v) = λ/2",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2021,
+            "source": "seed"
+          },
+          {
+            "id": "q6",
+            "subject": "Chemistry",
+            "topic": "Organic Chemistry",
+            "text": "Which of the following is the product of Markovnikov addition of HBr to propene?",
+            "options": [
+              "2-bromopropane",
+              "1-bromopropane",
+              "1,2-dibromopropane",
+              "2,2-dibromopropane"
+            ],
+            "correctIndex": 0,
+            "explanation": "By Markovnikov's rule, H adds to the carbon with more H atoms (C1), and Br adds to C2 giving 2-bromopropane.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE",
+              "BOARD"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q7",
+            "subject": "Chemistry",
+            "topic": "Electrochemistry",
+            "text": "The standard EMF of a cell with E°(cathode) = +0.80 V and E°(anode) = -0.44 V is:",
+            "options": [
+              "1.24 V",
+              "0.36 V",
+              "-1.24 V",
+              "1.80 V"
+            ],
+            "correctIndex": 0,
+            "explanation": "E°cell = E°cathode - E°anode = 0.80 - (-0.44) = 1.24 V",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "NEET"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q8",
+            "subject": "Chemistry",
+            "topic": "Chemical Kinetics",
+            "text": "For a first-order reaction, the half-life is 60 s. What fraction of the reactant remains after 3 half-lives?",
+            "options": [
+              "1/8",
+              "1/4",
+              "1/16",
+              "1/2"
+            ],
+            "correctIndex": 0,
+            "explanation": "After 3 half-lives: (1/2)³ = 1/8 of the original amount remains.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q9",
+            "subject": "Chemistry",
+            "topic": "Periodic Table",
+            "text": "Assertion: Ionization energy of Be is greater than B. Reason: Be has a completely filled 2s orbital which is extra stable.",
+            "options": [
+              "Both A and R are true and R is the correct explanation of A",
+              "Both A and R are true but R is not the correct explanation",
+              "A is true but R is false",
+              "A is false but R is true"
+            ],
+            "correctIndex": 0,
+            "explanation": "Be (1s²2s²) has a completely filled 2s subshell which is more stable, requiring more energy to remove an electron than B (1s²2s²2p¹).",
+            "difficulty": "Moderate",
+            "type": "Assertion-Reason",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q10",
+            "subject": "Biology",
+            "topic": "Cell Biology",
+            "text": "Which organelle is known as the 'powerhouse of the cell'?",
+            "options": [
+              "Mitochondria",
+              "Ribosome",
+              "Golgi apparatus",
+              "Lysosome"
+            ],
+            "correctIndex": 0,
+            "explanation": "Mitochondria produce ATP through cellular respiration (oxidative phosphorylation), hence called the powerhouse.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "BOARD"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q11",
+            "subject": "Biology",
+            "topic": "Genetics",
+            "text": "In a monohybrid cross between Tt × Tt, what is the probability of getting tall plants with Tt genotype?",
+            "options": [
+              "50%",
+              "25%",
+              "75%",
+              "100%"
+            ],
+            "correctIndex": 0,
+            "explanation": "Tt × Tt gives: TT (25%), Tt (50%), tt (25%). So Tt genotype = 50%",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "BOARD"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q12",
+            "subject": "Biology",
+            "topic": "Plant Physiology",
+            "text": "Which process is responsible for the movement of water from cell to cell in plants through osmosis?",
+            "options": [
+              "Plasmolysis",
+              "Imbibition",
+              "Osmosis",
+              "Transpiration"
+            ],
+            "correctIndex": 2,
+            "explanation": "Osmosis is the movement of water molecules across a semipermeable membrane from a region of higher water potential to lower water potential.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET"
+            ],
+            "year": 2021,
+            "source": "seed"
+          },
+          {
+            "id": "q13",
+            "subject": "Biology",
+            "topic": "Human Physiology",
+            "text": "Which enzyme in the stomach initiates protein digestion?",
+            "options": [
+              "Pepsin",
+              "Trypsin",
+              "Amylase",
+              "Lipase"
+            ],
+            "correctIndex": 0,
+            "explanation": "Pepsin, secreted as pepsinogen and activated by HCl in the stomach, begins protein digestion.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q14",
+            "subject": "Mathematics",
+            "topic": "Calculus",
+            "text": "The value of ∫₀¹ x²dx is:",
+            "options": [
+              "1/3",
+              "1/2",
+              "1",
+              "2/3"
+            ],
+            "correctIndex": 0,
+            "explanation": "∫x²dx = x³/3. Evaluating from 0 to 1: 1/3 - 0 = 1/3",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "BOARD"
+            ],
+            "source": "seed"
+          }
+        ],
+        "createdAt": "2026-05-14T17:38:40.676Z"
+      },
+      {
+        "id": "1778486011279r5ofh",
+        "title": "JEE Physics — Electrostatics",
+        "examType": "JEE",
+        "subject": "Physics",
+        "topic": "Electrostatics",
+        "difficulty": "Hard",
+        "questions": [
+          {
+            "id": "q_16ebcb56",
+            "subject": "Physics",
+            "topic": "Thermodynamics",
+            "text": "azad ke 4 bche ghainb  jmnbb ",
+            "options": [
+              "errr",
+              "bbbbbbb",
+              "ftfvbhj",
+              "ddddddd"
+            ],
+            "correctIndex": 0,
+            "explanation": "",
+            "difficulty": "Hard",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2025,
+            "source": "manual",
+            "createdAt": "2026-05-11T07:53:04.730Z"
+          },
+          {
+            "id": "q1",
+            "subject": "Physics",
+            "topic": "Electrostatics",
+            "text": "Two point charges +4μC and -4μC are placed 20 cm apart. What is the electric potential at the midpoint?",
+            "options": [
+              "Zero",
+              "720 kV",
+              "-720 kV",
+              "360 kV"
+            ],
+            "correctIndex": 0,
+            "explanation": "At the midpoint, V = kq/r + k(-q)/r = 0. The potentials due to equal and opposite charges cancel.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q2",
+            "subject": "Physics",
+            "topic": "Electrostatics",
+            "text": "A parallel plate capacitor has plate area 100 cm² and separation 2 mm. The capacitance is:",
+            "options": [
+              "4.43 pF",
+              "44.3 pF",
+              "0.443 pF",
+              "443 pF"
+            ],
+            "correctIndex": 0,
+            "explanation": "C = ε₀A/d = (8.85×10⁻¹²)(100×10⁻⁴)/(2×10⁻³) = 4.43 pF",
+            "difficulty": "Moderate",
+            "type": "MCQ",
+            "examType": [
+              "JEE"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q3",
+            "subject": "Physics",
+            "topic": "Thermodynamics",
+            "text": "In a Carnot cycle, the efficiency of the engine is 40%. If the heat rejected is 600 J, the work done by the engine is:",
+            "options": [
+              "400 J",
+              "240 J",
+              "600 J",
+              "1000 J"
+            ],
+            "correctIndex": 0,
+            "explanation": "Q_rejected = 600J, efficiency = 0.4. Q_absorbed = 1000J, W = 400J",
+            "difficulty": "Moderate",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "NEET"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q4",
+            "subject": "Physics",
+            "topic": "Optics",
+            "text": "A convex lens has focal length 20 cm. An object is placed 30 cm away. The image distance is:",
+            "options": [
+              "60 cm",
+              "-60 cm",
+              "30 cm",
+              "40 cm"
+            ],
+            "correctIndex": 0,
+            "explanation": "1/v - 1/u = 1/f → 1/v = 1/20 + 1/(-30) → v = 60 cm",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE",
+              "BOARD"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q5",
+            "subject": "Physics",
+            "topic": "Modern Physics",
+            "text": "The de Broglie wavelength of an electron moving with velocity v is λ. If the velocity is doubled, the wavelength becomes:",
+            "options": [
+              "λ/2",
+              "2λ",
+              "λ/4",
+              "4λ"
+            ],
+            "correctIndex": 0,
+            "explanation": "λ = h/mv. If v doubles, λ becomes h/(m·2v) = λ/2",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2021,
+            "source": "seed"
+          },
+          {
+            "id": "q6",
+            "subject": "Chemistry",
+            "topic": "Organic Chemistry",
+            "text": "Which of the following is the product of Markovnikov addition of HBr to propene?",
+            "options": [
+              "2-bromopropane",
+              "1-bromopropane",
+              "1,2-dibromopropane",
+              "2,2-dibromopropane"
+            ],
+            "correctIndex": 0,
+            "explanation": "By Markovnikov's rule, H adds to the carbon with more H atoms (C1), and Br adds to C2 giving 2-bromopropane.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE",
+              "BOARD"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q7",
+            "subject": "Chemistry",
+            "topic": "Electrochemistry",
+            "text": "The standard EMF of a cell with E°(cathode) = +0.80 V and E°(anode) = -0.44 V is:",
+            "options": [
+              "1.24 V",
+              "0.36 V",
+              "-1.24 V",
+              "1.80 V"
+            ],
+            "correctIndex": 0,
+            "explanation": "E°cell = E°cathode - E°anode = 0.80 - (-0.44) = 1.24 V",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "NEET"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q8",
+            "subject": "Chemistry",
+            "topic": "Chemical Kinetics",
+            "text": "For a first-order reaction, the half-life is 60 s. What fraction of the reactant remains after 3 half-lives?",
+            "options": [
+              "1/8",
+              "1/4",
+              "1/16",
+              "1/2"
+            ],
+            "correctIndex": 0,
+            "explanation": "After 3 half-lives: (1/2)³ = 1/8 of the original amount remains.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q9",
+            "subject": "Chemistry",
+            "topic": "Periodic Table",
+            "text": "Assertion: Ionization energy of Be is greater than B. Reason: Be has a completely filled 2s orbital which is extra stable.",
+            "options": [
+              "Both A and R are true and R is the correct explanation of A",
+              "Both A and R are true but R is not the correct explanation",
+              "A is true but R is false",
+              "A is false but R is true"
+            ],
+            "correctIndex": 0,
+            "explanation": "Be (1s²2s²) has a completely filled 2s subshell which is more stable, requiring more energy to remove an electron than B (1s²2s²2p¹).",
+            "difficulty": "Moderate",
+            "type": "Assertion-Reason",
+            "examType": [
+              "NEET",
+              "JEE"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q10",
+            "subject": "Biology",
+            "topic": "Cell Biology",
+            "text": "Which organelle is known as the 'powerhouse of the cell'?",
+            "options": [
+              "Mitochondria",
+              "Ribosome",
+              "Golgi apparatus",
+              "Lysosome"
+            ],
+            "correctIndex": 0,
+            "explanation": "Mitochondria produce ATP through cellular respiration (oxidative phosphorylation), hence called the powerhouse.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "BOARD"
+            ],
+            "year": 2023,
+            "source": "seed"
+          },
+          {
+            "id": "q11",
+            "subject": "Biology",
+            "topic": "Genetics",
+            "text": "In a monohybrid cross between Tt × Tt, what is the probability of getting tall plants with Tt genotype?",
+            "options": [
+              "50%",
+              "25%",
+              "75%",
+              "100%"
+            ],
+            "correctIndex": 0,
+            "explanation": "Tt × Tt gives: TT (25%), Tt (50%), tt (25%). So Tt genotype = 50%",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET",
+              "BOARD"
+            ],
+            "source": "seed"
+          },
+          {
+            "id": "q12",
+            "subject": "Biology",
+            "topic": "Plant Physiology",
+            "text": "Which process is responsible for the movement of water from cell to cell in plants through osmosis?",
+            "options": [
+              "Plasmolysis",
+              "Imbibition",
+              "Osmosis",
+              "Transpiration"
+            ],
+            "correctIndex": 2,
+            "explanation": "Osmosis is the movement of water molecules across a semipermeable membrane from a region of higher water potential to lower water potential.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET"
+            ],
+            "year": 2021,
+            "source": "seed"
+          },
+          {
+            "id": "q13",
+            "subject": "Biology",
+            "topic": "Human Physiology",
+            "text": "Which enzyme in the stomach initiates protein digestion?",
+            "options": [
+              "Pepsin",
+              "Trypsin",
+              "Amylase",
+              "Lipase"
+            ],
+            "correctIndex": 0,
+            "explanation": "Pepsin, secreted as pepsinogen and activated by HCl in the stomach, begins protein digestion.",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "NEET"
+            ],
+            "year": 2022,
+            "source": "seed"
+          },
+          {
+            "id": "q14",
+            "subject": "Mathematics",
+            "topic": "Calculus",
+            "text": "The value of ∫₀¹ x²dx is:",
+            "options": [
+              "1/3",
+              "1/2",
+              "1",
+              "2/3"
+            ],
+            "correctIndex": 0,
+            "explanation": "∫x²dx = x³/3. Evaluating from 0 to 1: 1/3 - 0 = 1/3",
+            "difficulty": "Easy",
+            "type": "MCQ",
+            "examType": [
+              "JEE",
+              "BOARD"
+            ],
+            "source": "seed"
+          }
+        ],
+        "createdAt": "2026-05-11T07:53:31.279Z"
+      }
+    ]
+  },
+  "questions": [
+    {
+      "id": "q_16ebcb56",
+      "subject": "Physics",
+      "topic": "Thermodynamics",
+      "text": "azad ke 4 bche ghainb  jmnbb ",
+      "options": [
+        "errr",
+        "bbbbbbb",
+        "ftfvbhj",
+        "ddddddd"
+      ],
+      "correctIndex": 0,
+      "explanation": "",
+      "difficulty": "Hard",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "year": 2025,
+      "source": "manual",
+      "createdAt": "2026-05-11T07:53:04.730Z"
+    },
+    {
+      "id": "q1",
+      "subject": "Physics",
+      "topic": "Electrostatics",
+      "text": "Two point charges +4μC and -4μC are placed 20 cm apart. What is the electric potential at the midpoint?",
+      "options": [
+        "Zero",
+        "720 kV",
+        "-720 kV",
+        "360 kV"
+      ],
+      "correctIndex": 0,
+      "explanation": "At the midpoint, V = kq/r + k(-q)/r = 0. The potentials due to equal and opposite charges cancel.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "year": 2023,
+      "source": "seed"
+    },
+    {
+      "id": "q2",
+      "subject": "Physics",
+      "topic": "Electrostatics",
+      "text": "A parallel plate capacitor has plate area 100 cm² and separation 2 mm. The capacitance is:",
+      "options": [
+        "4.43 pF",
+        "44.3 pF",
+        "0.443 pF",
+        "443 pF"
+      ],
+      "correctIndex": 0,
+      "explanation": "C = ε₀A/d = (8.85×10⁻¹²)(100×10⁻⁴)/(2×10⁻³) = 4.43 pF",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q3",
+      "subject": "Physics",
+      "topic": "Thermodynamics",
+      "text": "In a Carnot cycle, the efficiency of the engine is 40%. If the heat rejected is 600 J, the work done by the engine is:",
+      "options": [
+        "400 J",
+        "240 J",
+        "600 J",
+        "1000 J"
+      ],
+      "correctIndex": 0,
+      "explanation": "Q_rejected = 600J, efficiency = 0.4. Q_absorbed = 1000J, W = 400J",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "NEET"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q4",
+      "subject": "Physics",
+      "topic": "Optics",
+      "text": "A convex lens has focal length 20 cm. An object is placed 30 cm away. The image distance is:",
+      "options": [
+        "60 cm",
+        "-60 cm",
+        "30 cm",
+        "40 cm"
+      ],
+      "correctIndex": 0,
+      "explanation": "1/v - 1/u = 1/f → 1/v = 1/20 + 1/(-30) → v = 60 cm",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE",
+        "BOARD"
+      ],
+      "year": 2022,
+      "source": "seed"
+    },
+    {
+      "id": "q5",
+      "subject": "Physics",
+      "topic": "Modern Physics",
+      "text": "The de Broglie wavelength of an electron moving with velocity v is λ. If the velocity is doubled, the wavelength becomes:",
+      "options": [
+        "λ/2",
+        "2λ",
+        "λ/4",
+        "4λ"
+      ],
+      "correctIndex": 0,
+      "explanation": "λ = h/mv. If v doubles, λ becomes h/(m·2v) = λ/2",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "year": 2021,
+      "source": "seed"
+    },
+    {
+      "id": "q6",
+      "subject": "Chemistry",
+      "topic": "Organic Chemistry",
+      "text": "Which of the following is the product of Markovnikov addition of HBr to propene?",
+      "options": [
+        "2-bromopropane",
+        "1-bromopropane",
+        "1,2-dibromopropane",
+        "2,2-dibromopropane"
+      ],
+      "correctIndex": 0,
+      "explanation": "By Markovnikov's rule, H adds to the carbon with more H atoms (C1), and Br adds to C2 giving 2-bromopropane.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE",
+        "BOARD"
+      ],
+      "year": 2023,
+      "source": "seed"
+    },
+    {
+      "id": "q7",
+      "subject": "Chemistry",
+      "topic": "Electrochemistry",
+      "text": "The standard EMF of a cell with E°(cathode) = +0.80 V and E°(anode) = -0.44 V is:",
+      "options": [
+        "1.24 V",
+        "0.36 V",
+        "-1.24 V",
+        "1.80 V"
+      ],
+      "correctIndex": 0,
+      "explanation": "E°cell = E°cathode - E°anode = 0.80 - (-0.44) = 1.24 V",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "NEET"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q8",
+      "subject": "Chemistry",
+      "topic": "Chemical Kinetics",
+      "text": "For a first-order reaction, the half-life is 60 s. What fraction of the reactant remains after 3 half-lives?",
+      "options": [
+        "1/8",
+        "1/4",
+        "1/16",
+        "1/2"
+      ],
+      "correctIndex": 0,
+      "explanation": "After 3 half-lives: (1/2)³ = 1/8 of the original amount remains.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "year": 2022,
+      "source": "seed"
+    },
+    {
+      "id": "q9",
+      "subject": "Chemistry",
+      "topic": "Periodic Table",
+      "text": "Assertion: Ionization energy of Be is greater than B. Reason: Be has a completely filled 2s orbital which is extra stable.",
+      "options": [
+        "Both A and R are true and R is the correct explanation of A",
+        "Both A and R are true but R is not the correct explanation",
+        "A is true but R is false",
+        "A is false but R is true"
+      ],
+      "correctIndex": 0,
+      "explanation": "Be (1s²2s²) has a completely filled 2s subshell which is more stable, requiring more energy to remove an electron than B (1s²2s²2p¹).",
+      "difficulty": "Moderate",
+      "type": "Assertion-Reason",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q10",
+      "subject": "Biology",
+      "topic": "Cell Biology",
+      "text": "Which organelle is known as the 'powerhouse of the cell'?",
+      "options": [
+        "Mitochondria",
+        "Ribosome",
+        "Golgi apparatus",
+        "Lysosome"
+      ],
+      "correctIndex": 0,
+      "explanation": "Mitochondria produce ATP through cellular respiration (oxidative phosphorylation), hence called the powerhouse.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "BOARD"
+      ],
+      "year": 2023,
+      "source": "seed"
+    },
+    {
+      "id": "q11",
+      "subject": "Biology",
+      "topic": "Genetics",
+      "text": "In a monohybrid cross between Tt × Tt, what is the probability of getting tall plants with Tt genotype?",
+      "options": [
+        "50%",
+        "25%",
+        "75%",
+        "100%"
+      ],
+      "correctIndex": 0,
+      "explanation": "Tt × Tt gives: TT (25%), Tt (50%), tt (25%). So Tt genotype = 50%",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "BOARD"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q12",
+      "subject": "Biology",
+      "topic": "Plant Physiology",
+      "text": "Which process is responsible for the movement of water from cell to cell in plants through osmosis?",
+      "options": [
+        "Plasmolysis",
+        "Imbibition",
+        "Osmosis",
+        "Transpiration"
+      ],
+      "correctIndex": 2,
+      "explanation": "Osmosis is the movement of water molecules across a semipermeable membrane from a region of higher water potential to lower water potential.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET"
+      ],
+      "year": 2021,
+      "source": "seed"
+    },
+    {
+      "id": "q13",
+      "subject": "Biology",
+      "topic": "Human Physiology",
+      "text": "Which enzyme in the stomach initiates protein digestion?",
+      "options": [
+        "Pepsin",
+        "Trypsin",
+        "Amylase",
+        "Lipase"
+      ],
+      "correctIndex": 0,
+      "explanation": "Pepsin, secreted as pepsinogen and activated by HCl in the stomach, begins protein digestion.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET"
+      ],
+      "year": 2022,
+      "source": "seed"
+    },
+    {
+      "id": "q14",
+      "subject": "Mathematics",
+      "topic": "Calculus",
+      "text": "The value of ∫₀¹ x²dx is:",
+      "options": [
+        "1/3",
+        "1/2",
+        "1",
+        "2/3"
+      ],
+      "correctIndex": 0,
+      "explanation": "∫x²dx = x³/3. Evaluating from 0 to 1: 1/3 - 0 = 1/3",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "BOARD"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q15",
+      "subject": "Mathematics",
+      "topic": "Coordinate Geometry",
+      "text": "The equation of a circle with center (2, -3) and radius 4 is:",
+      "options": [
+        "(x-2)² + (y+3)² = 16",
+        "(x+2)² + (y-3)² = 16",
+        "(x-2)² + (y-3)² = 4",
+        "(x+2)² + (y+3)² = 16"
+      ],
+      "correctIndex": 0,
+      "explanation": "Standard form: (x-h)² + (y-k)² = r². With h=2, k=-3, r=4: (x-2)² + (y+3)² = 16",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "BOARD"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q16",
+      "subject": "Mathematics",
+      "topic": "Algebra",
+      "text": "If the roots of 2x² - 5x + k = 0 are equal, then k =",
+      "options": [
+        "25/8",
+        "5/2",
+        "5/4",
+        "25/4"
+      ],
+      "correctIndex": 0,
+      "explanation": "For equal roots, discriminant = 0. b² - 4ac = 25 - 8k = 0 → k = 25/8",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q17",
+      "subject": "Physics",
+      "topic": "Waves",
+      "text": "A string of length 1 m is fixed at both ends. The fundamental frequency is 100 Hz. What is the wave speed?",
+      "options": [
+        "200 m/s",
+        "100 m/s",
+        "50 m/s",
+        "400 m/s"
+      ],
+      "correctIndex": 0,
+      "explanation": "f₁ = v/2L → v = 2Lf₁ = 2 × 1 × 100 = 200 m/s",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "NEET"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q18",
+      "subject": "Chemistry",
+      "topic": "Atomic Structure",
+      "text": "The maximum number of electrons in a subshell with l = 3 is:",
+      "options": [
+        "14",
+        "10",
+        "6",
+        "18"
+      ],
+      "correctIndex": 0,
+      "explanation": "For l=3 (f subshell), m ranges from -3 to +3 (7 values). Each orbital holds 2 electrons: 2 × 7 = 14 electrons.",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "NEET",
+        "JEE"
+      ],
+      "year": 2020,
+      "source": "seed"
+    },
+    {
+      "id": "q19",
+      "subject": "Biology",
+      "topic": "Ecology",
+      "text": "Which of the following is a primary producer in an aquatic ecosystem?",
+      "options": [
+        "Phytoplankton",
+        "Zooplankton",
+        "Fish",
+        "Decomposers"
+      ],
+      "correctIndex": 0,
+      "explanation": "Phytoplankton are photosynthetic organisms that form the base of the aquatic food chain (primary producers).",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "NEET"
+      ],
+      "source": "seed"
+    },
+    {
+      "id": "q20",
+      "subject": "Physics",
+      "topic": "Magnetism",
+      "text": "A current of 5A flows through a circular loop of radius 10 cm. The magnetic field at the center is:",
+      "options": [
+        "10π μT",
+        "5π μT",
+        "20π μT",
+        "25π μT"
+      ],
+      "correctIndex": 0,
+      "explanation": "B = μ₀I/2r = (4π×10⁻⁷ × 5)/(2 × 0.1) = 10π × 10⁻⁶ T = 10π μT",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE",
+        "NEET"
+      ],
+      "source": "seed"
+    }
+  ]
+}
