@@ -9,6 +9,7 @@ const DATA_FILE = path.join(DATA_DIR, "db.json");
 
 const DEFAULT_DB = {
   users: {},      // userId -> profile
+  accounts: {},   // userId -> { email, passwordHash }
   attempts: {},   // userId -> QuizAttempt[]
   papers: {},     // userId -> GeneratedPaper[]
   questions: [],  // Question[] — global, managed by admin
@@ -37,11 +38,35 @@ function write(db) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
 }
 
+function findAccountByEmail(email) {
+  const db = read();
+  const normalizedEmail = email?.trim().toLowerCase();
+  const accounts = db.accounts || {};
+  for (const [userId, account] of Object.entries(accounts)) {
+    if (account.email === normalizedEmail) {
+      return { userId, ...account };
+    }
+  }
+  return null;
+}
+
 export const jsonStorage = {
   async getProfile(userId) {
     const db = read();
     return db.users[userId] || null;
   },
+  
+  async getProfileByEmail(email) {
+    const db = read();
+    const normalizedEmail = email.trim().toLowerCase();
+    for (const [userId, profile] of Object.entries(db.users || {})) {
+      if (profile.email?.toLowerCase() === normalizedEmail) {
+        return { id: userId, ...profile };
+      }
+    }
+    return null;
+  },
+  
   async saveProfile(userId, profile) {
     const db = read();
     db.users[userId] = profile;
@@ -86,6 +111,33 @@ export const jsonStorage = {
       };
     }
     write(db);
+  },
+
+  async getAllProfiles() {
+    const db = read();
+    return Object.entries(db.users).map(([id, profile]) => ({ id, ...profile }));
+  },
+
+  async findAccountByEmail(email) {
+    return findAccountByEmail(email);
+  },
+
+  async createAccount(userId, email, passwordHash) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const db = read();
+    if (findAccountByEmail(normalizedEmail)) {
+      throw new Error("Account already exists");
+    }
+    db.accounts = db.accounts || {};
+    db.accounts[userId] = { email: normalizedEmail, passwordHash };
+    write(db);
+    return { userId, email: normalizedEmail };
+  },
+
+  async verifyAccount(email, passwordHash) {
+    const account = findAccountByEmail(email);
+    if (!account || account.passwordHash !== passwordHash) return null;
+    return account;
   },
 
   // ----- Questions (admin-managed, global) -----

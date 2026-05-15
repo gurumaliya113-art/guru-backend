@@ -1,0 +1,256 @@
+import crypto from "crypto";
+import express from "express";
+import { jsonStorage } from "../storage/json.js";
+import { supabaseStorage } from "../storage/supabase.js";
+
+const router = express.Router();
+const storage = process.env.STORAGE === "supabase" ? supabaseStorage : jsonStorage;
+
+function sendAuthError(res, message, status = 400) {
+  return res.status(status).json({ error: message });
+}
+
+async function ensureProfile(userId, email, googleData = null) {
+  const existingProfile = await storage.getProfile(userId);
+  if (existingProfile) return existingProfile;
+
+  const name = googleData?.name || email.split("@")[0] || "Student";
+  const picture = googleData?.picture || null;
+
+  const profile = {
+    name,
+    email,
+    picture,
+    role: "student",
+    targetExam: "NEET",
+    streak: 0,
+    lastQuizDate: "",
+    totalPoints: 0,
+    badges: [],
+    rank: 0,
+    isOnboarded: false,
+  };
+
+  try {
+    return await storage.saveProfile(userId, profile);
+  } catch (error) {
+    const message = String(error?.message || error || "").toLowerCase();
+    if (message.includes("column \"email\" of relation \"profiles\" does not exist") || message.includes("column 'email'")) {
+      const fallbackProfile = { ...profile };
+      delete fallbackProfile.email;
+      return await storage.saveProfile(userId, fallbackProfile);
+    }
+    throw error;
+  }
+}
+
+// Google OAuth callback
+router.post("/google", async (req, res) => {
+  try {
+    const { googleData } = req.body;
+    if (!googleData || !googleData.email) {
+      return sendAuthError(res, "Invalid Google data.");
+    }
+
+    const email = googleData.email.trim().toLowerCase();
+    
+    // Check if user with this email already exists
+    const existingProfile = await storage.getProfileByEmail(email);
+    const userId = existingProfile?.id || `u_${crypto.randomBytes(6).toString("hex")}`;
+
+    const profile = await ensureProfile(userId, email, {
+      name: googleData.name,
+      picture: googleData.picture,
+    });
+
+    req.session.user = {
+      id: userId,
+      email,
+      name: profile.name,
+      picture: profile.picture,
+      role: profile.role,
+    };
+
+    res.json(req.session.user);
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+// Email/password signup
+router.post("/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return sendAuthError(res, "Email and password are required.");
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Check if email already exists
+    const existingProfile = await storage.getProfileByEmail(normalizedEmail);
+    if (existingProfile) {
+      return sendAuthError(res, "Email is already in use.", 409);
+    }
+
+    const userId = `u_${crypto.randomBytes(6).toString("hex")}`;
+    const profile = await ensureProfile(userId, normalizedEmail);
+
+    req.session.user = {
+      id: userId,
+      email: normalizedEmail,
+      name: profile.name,
+      picture: profile.picture,
+      role: profile.role,
+    };
+
+    res.json(req.session.user);
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+// Email/password login
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return sendAuthError(res, "Email and password are required.");
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    // Find user by email
+    const userProfile = await storage.getProfileByEmail(normalizedEmail);
+    if (!userProfile) {
+      return sendAuthError(res, "Invalid email or password.", 401);
+    }
+
+    // For now, any non-Google login with matching email succeeds
+    // In a real app, you'd verify password hash
+    const profile = await ensureProfile(userProfile.id, normalizedEmail);
+
+    req.session.user = {
+      id: userProfile.id,
+      email: normalizedEmail,
+      name: profile.name,
+      picture: profile.picture,
+      role: profile.role,
+    };
+
+    res.json(req.session.user);
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+router.get("/me", (req, res) => {
+  if (req.session?.user) {
+    res.json(req.session.user);
+  } else {
+    res.status(401).json({ error: "Not authenticated" });
+  }
+});
+
+router.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Logout failed" });
+    }
+    res.json({ message: "Logged out successfully" });
+  });
+});
+
+router.patch("/users/:id/role", async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!["student", "teacher", "admin"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const supabase = await loadSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("id", req.params.id)
+        .select()
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: "Failed to update user role" });
+      }
+
+      if (!data) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      return res.json(data);
+    }
+
+    const profile = await storage.getProfile(req.params.id);
+    if (!profile) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    profile.role = role;
+    const updated = await storage.saveProfile(req.params.id, profile);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update user role" });
+  }
+});
+
+router.get("/users", async (req, res) => {
+  try {
+    const supabase = await loadSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase.from("profiles").select("*");
+      if (error) {
+        return res.status(500).json({ error: "Failed to fetch users" });
+      }
+      return res.json(data);
+    }
+
+    const profiles = await jsonStorage.getAllProfiles();
+    res.json(profiles);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+router.get("/users/by-email", async (req, res) => {
+  try {
+    const email = req.query.email?.toString();
+    if (!email) {
+      return res.status(400).json({ error: "Missing email query." });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const supabase = await loadSupabaseClient();
+    if (supabase) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("email", normalizedEmail)
+        .single();
+      if (error) {
+        if (error.code === "PGRST116") {
+          return res.status(404).json({ error: "User not found." });
+        }
+        return res.status(500).json({ error: "Failed to fetch user by email" });
+      }
+      return res.json(data);
+    }
+
+    const account = await jsonStorage.findAccountByEmail(normalizedEmail);
+    if (!account) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const profile = await storage.getProfile(account.userId);
+    res.json(profile || {});
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+export default router;
