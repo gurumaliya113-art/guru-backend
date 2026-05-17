@@ -123,7 +123,32 @@ app.put("/api/profile", requireAuth, async (req, res) => {
   const user = getCurrentUser(req, res);
   if (!user) return;
   try {
-    const saved = await storage.saveProfile(user.id.toString(), req.body);
+    const incoming = { ...(req.body || {}) };
+    const teacherInviteCode = incoming.teacherInviteCode;
+    // Never persist the invite code in the profile.
+    delete incoming.teacherInviteCode;
+
+    // Invite-only check: a user can only become a teacher if they provide
+    // the configured invite code (or are already a teacher in storage).
+    if (incoming.role === "teacher") {
+      const existing = await storage.getProfile(user.id.toString());
+      const alreadyTeacher = existing && existing.role === "teacher";
+      if (!alreadyTeacher) {
+        const expected = (process.env.TEACHER_INVITE_CODE || "").trim();
+        if (!expected) {
+          return res.status(503).json({
+            error: "Teacher registration is disabled. Ask the admin to set TEACHER_INVITE_CODE.",
+          });
+        }
+        if (!teacherInviteCode || teacherInviteCode.trim() !== expected) {
+          return res.status(403).json({
+            error: "Invalid teacher invite code. Please contact your admin.",
+          });
+        }
+      }
+    }
+
+    const saved = await storage.saveProfile(user.id.toString(), incoming);
     res.json({ profile: saved });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
