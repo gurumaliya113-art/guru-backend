@@ -146,10 +146,15 @@ app.put("/api/profile", requireAuth, async (req, res) => {
       incoming.passwordHash = hashPassword(rawPassword);
     }
 
+    // Fetch existing profile and merge so server-managed / non-editable fields
+    // (email, picture, existing passwordHash) survive partial updates from the
+    // client. Without this, a single PUT from Onboarding would wipe out the
+    // signup-time email + password hash, breaking subsequent password logins.
+    const existing = (await storage.getProfile(user.id.toString())) || {};
+
     // Invite-only check: a user can only become a teacher if they provide
     // the configured invite code (or are already a teacher in storage).
     if (incoming.role === "teacher") {
-      const existing = await storage.getProfile(user.id.toString());
       const alreadyTeacher = existing && existing.role === "teacher";
       if (!alreadyTeacher) {
         const expected = (process.env.TEACHER_INVITE_CODE || "").trim();
@@ -166,7 +171,16 @@ app.put("/api/profile", requireAuth, async (req, res) => {
       }
     }
 
-    const saved = await storage.saveProfile(user.id.toString(), incoming);
+    const merged = {
+      ...existing,
+      ...incoming,
+      // Always retain identity / auth fields from the existing profile unless
+      // the client is explicitly setting a new password (already hashed above).
+      email: incoming.email || existing.email,
+      passwordHash: incoming.passwordHash || existing.passwordHash,
+    };
+
+    const saved = await storage.saveProfile(user.id.toString(), merged);
     res.json({ profile: sanitizeProfile(saved) });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
