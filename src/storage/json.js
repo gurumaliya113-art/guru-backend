@@ -70,6 +70,25 @@ export const jsonStorage = {
     }
     return null;
   },
+
+  /**
+   * Lookup a profile by ANY of: email, username (case-insensitive), or phone.
+   * Used for the multi-identifier login flow.
+   */
+  async getProfileByIdentifier(identifier) {
+    const db = read();
+    const raw = String(identifier || "").trim();
+    if (!raw) return null;
+    const norm = raw.toLowerCase();
+    const phoneDigits = raw.replace(/\D/g, "");
+    for (const [userId, profile] of Object.entries(db.users || {})) {
+      if (profile.email?.toLowerCase() === norm) return { id: userId, ...profile };
+      if (profile.username?.toLowerCase() === norm) return { id: userId, ...profile };
+      const pDigits = (profile.phone || "").replace(/\D/g, "");
+      if (phoneDigits && pDigits && pDigits === phoneDigits) return { id: userId, ...profile };
+    }
+    return null;
+  },
   
   async saveProfile(userId, profile) {
     const db = read();

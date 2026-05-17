@@ -9,6 +9,7 @@ import { jsonStorage } from "./storage/json.js";
 import { supabaseStorage } from "./storage/supabase.js";
 import { buildAdminRouter } from "./admin-routes.js";
 import { getPageImageBytes } from "./storage/pdf-storage.js";
+import { hashPassword } from "./password.js";
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
 const storage = process.env.STORAGE === "supabase" ? supabaseStorage : jsonStorage;
@@ -108,12 +109,18 @@ app.get("/api/documents/:id/pages/:n.png", async (req, res) => {
 app.use("/api/admin", buildAdminRouter(storage));
 
 // --- Profile ---
+function sanitizeProfile(profile) {
+  if (!profile) return profile;
+  const { passwordHash, password_hash, ...rest } = profile;
+  return rest;
+}
+
 app.get("/api/profile", requireAuth, async (req, res) => {
   const user = getCurrentUser(req, res);
   if (!user) return;
   try {
     const profile = await storage.getProfile(user.id.toString());
-    res.json({ profile });
+    res.json({ profile: sanitizeProfile(profile) });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
@@ -125,8 +132,19 @@ app.put("/api/profile", requireAuth, async (req, res) => {
   try {
     const incoming = { ...(req.body || {}) };
     const teacherInviteCode = incoming.teacherInviteCode;
-    // Never persist the invite code in the profile.
+    const rawPassword = incoming.password;
+    // Never persist the invite code or the raw password in the profile.
     delete incoming.teacherInviteCode;
+    delete incoming.password;
+    // Don't let a client clobber the stored hash directly.
+    delete incoming.passwordHash;
+
+    if (rawPassword) {
+      if (typeof rawPassword !== "string" || rawPassword.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters." });
+      }
+      incoming.passwordHash = hashPassword(rawPassword);
+    }
 
     // Invite-only check: a user can only become a teacher if they provide
     // the configured invite code (or are already a teacher in storage).
@@ -149,7 +167,7 @@ app.put("/api/profile", requireAuth, async (req, res) => {
     }
 
     const saved = await storage.saveProfile(user.id.toString(), incoming);
-    res.json({ profile: saved });
+    res.json({ profile: sanitizeProfile(saved) });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }

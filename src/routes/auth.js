@@ -3,6 +3,7 @@ import express from "express";
 import { OAuth2Client } from "google-auth-library";
 import { jsonStorage } from "../storage/json.js";
 import { supabaseStorage } from "../storage/supabase.js";
+import { hashPassword, verifyPassword } from "../password.js";
 
 const router = express.Router();
 const storage = process.env.STORAGE === "supabase" ? supabaseStorage : jsonStorage;
@@ -89,16 +90,20 @@ router.post("/google", async (req, res) => {
   }
 });
 
-// Email/password signup
+// Email/password signup. Password is hashed with scrypt and stored on the
+// profile (`passwordHash` field) so we can verify it on subsequent logins.
 router.post("/signup", async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return sendAuthError(res, "Email and password are required.");
     }
+    if (String(password).length < 6) {
+      return sendAuthError(res, "Password must be at least 6 characters.");
+    }
 
     const normalizedEmail = email.trim().toLowerCase();
-    
+
     // Check if email already exists
     const existingProfile = await storage.getProfileByEmail(normalizedEmail);
     if (existingProfile) {
@@ -107,6 +112,10 @@ router.post("/signup", async (req, res) => {
 
     const userId = `u_${crypto.randomBytes(6).toString("hex")}`;
     const profile = await ensureProfile(userId, normalizedEmail);
+
+    // Persist hashed password on the profile.
+    const passwordHash = hashPassword(password);
+    await storage.saveProfile(userId, { ...profile, passwordHash });
 
     req.session.user = {
       id: userId,
@@ -122,29 +131,48 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Email/password login
+// Email/Phone/Username + password login.
+// Accepts `identifier` (preferred) or legacy `email`.
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return sendAuthError(res, "Email and password are required.");
+    const { identifier, email, password } = req.body || {};
+    const id = (identifier ?? email ?? "").toString().trim();
+    if (!id || !password) {
+      return sendAuthError(res, "Login ID and password are required.");
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    
-    // Find user by email
-    const userProfile = await storage.getProfileByEmail(normalizedEmail);
+    // Multi-identifier lookup: email / username / phone
+    let userProfile = null;
+    if (typeof storage.getProfileByIdentifier === "function") {
+      userProfile = await storage.getProfileByIdentifier(id);
+    }
     if (!userProfile) {
-      return sendAuthError(res, "Invalid email or password.", 401);
+      userProfile = await storage.getProfileByEmail(id);
+    }
+    if (!userProfile) {
+      return sendAuthError(res, "Invalid login ID or password.", 401);
     }
 
-    // For now, any non-Google login with matching email succeeds
-    // In a real app, you'd verify password hash
-    const profile = await ensureProfile(userProfile.id, normalizedEmail);
+    // Verify password against the stored scrypt hash. If the user has no hash
+    // yet (legacy account or Google-only account), we refuse the password
+    // login so a guessable email can't hijack them — they must use Google or
+    // reset their password via the onboarding form.
+    if (!userProfile.passwordHash) {
+      return sendAuthError(
+        res,
+        "This account has no password set. Sign in with Google, or register again to set a password.",
+        401
+      );
+    }
+    if (!verifyPassword(password, userProfile.passwordHash)) {
+      return sendAuthError(res, "Invalid login ID or password.", 401);
+    }
+
+    const profile = await ensureProfile(userProfile.id, userProfile.email || id);
 
     req.session.user = {
       id: userProfile.id,
-      email: normalizedEmail,
+      email: userProfile.email || profile.email || null,
       name: profile.name,
       picture: profile.picture,
       role: profile.role,

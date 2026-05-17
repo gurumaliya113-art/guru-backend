@@ -42,6 +42,46 @@ export const supabaseStorage = {
     return data ? toCamelCase(data) : null;
   },
 
+  /**
+   * Lookup a profile by ANY of: email, username (case-insensitive), or phone.
+   * Used for the multi-identifier login flow. Returns the first match.
+   */
+  async getProfileByIdentifier(identifier) {
+    const raw = String(identifier || "").trim();
+    if (!raw) return null;
+    const norm = raw.toLowerCase();
+
+    // Try email (case-insensitive)
+    {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("email", norm)
+        .maybeSingle();
+      if (data) return toCamelCase(data);
+    }
+    // Try username (case-insensitive)
+    {
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("username", norm)
+        .maybeSingle();
+      if (data) return toCamelCase(data);
+    }
+    // Try phone (exact + digits-only fallback)
+    {
+      const phoneDigits = raw.replace(/\D/g, "");
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .or(`phone.eq.${raw},phone.eq.${phoneDigits}`)
+        .maybeSingle();
+      if (data) return toCamelCase(data);
+    }
+    return null;
+  },
+
   async saveProfile(userId, profile) {
     const dbPayload = toSnakeCase({ id: userId, ...profile });
     const { data, error } = await supabase
