@@ -156,4 +156,182 @@ export const supabaseStorage = {
     const { error } = await supabase.from("questions").delete().eq("id", id);
     handleError(error);
   },
+
+  // ----- Documents (uploaded PDFs) -----
+  async addDocument(doc) {
+    const dbPayload = toSnakeCase(doc);
+    const { data, error } = await supabase
+      .from("documents")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+  async getDocuments() {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("*")
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+  async getDocument(id) {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  // ----- Classes -----
+  async getClasses() {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+
+  async getClass(id) {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getClassByCode(code) {
+    const norm = String(code || "").trim().toUpperCase();
+    // Codes are stored uppercase by the generator, but be defensive with ilike.
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .ilike("code", norm)
+      .limit(1)
+      .maybeSingle();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getClassesByTeacher(teacherId) {
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*")
+      .eq("teacher_id", teacherId)
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+
+  async addClass(cls) {
+    const dbPayload = toSnakeCase(cls);
+    const { data, error } = await supabase
+      .from("classes")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  // ----- Memberships -----
+  async getMemberships() {
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("*")
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+
+  async getMembershipsByClass(classId) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("*")
+      .eq("class_id", classId)
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+
+  async getMembershipsByStudent(studentId) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+
+  async addMembership(m) {
+    const dbPayload = toSnakeCase(m);
+    const { data, error } = await supabase
+      .from("memberships")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async updateMembership(id, updates) {
+    const dbPayload = toSnakeCase(updates);
+    const { data, error } = await supabase
+      .from("memberships")
+      .update(dbPayload)
+      .eq("id", id)
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  // ----- Assignments -----
+  async getAssignments() {
+    const { data, error } = await supabase
+      .from("assignments")
+      .select("*")
+      .order("assigned_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+  async getAssignmentsByClass(classId) {
+    const { data, error } = await supabase
+      .from("assignments")
+      .select("*")
+      .eq("class_id", classId)
+      .order("assigned_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+  async getAssignmentsByPaper(paperId) {
+    const { data, error } = await supabase
+      .from("assignments")
+      .select("*")
+      .eq("paper_id", paperId)
+      .order("assigned_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+  async addAssignment(a) {
+    const dbPayload = toSnakeCase(a);
+    const { data, error } = await supabase
+      .from("assignments")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+  async deleteAssignment(id) {
+    const { error } = await supabase.from("assignments").delete().eq("id", id);
+    handleError(error);
+  },
 };

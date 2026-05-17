@@ -8,11 +8,15 @@ const DATA_DIR = path.resolve(__dirname, "../../data");
 const DATA_FILE = path.join(DATA_DIR, "db.json");
 
 const DEFAULT_DB = {
-  users: {},      // userId -> profile
-  accounts: {},   // userId -> { email, passwordHash }
-  attempts: {},   // userId -> QuizAttempt[]
-  papers: {},     // userId -> GeneratedPaper[]
-  questions: [],  // Question[] — global, managed by admin
+  users: {},        // userId -> profile
+  accounts: {},     // userId -> { email, passwordHash }
+  attempts: {},     // userId -> QuizAttempt[]
+  papers: {},       // userId -> GeneratedPaper[]
+  questions: [],    // Question[] — global, managed by admin
+  documents: [],    // Document[] — uploaded PDF metadata
+  classes: [],      // ClassRoom[]
+  memberships: [],  // Membership[]
+  assignments: [],  // Assignment[]  — paper assigned to class
 };
 
 function ensureFile() {
@@ -173,6 +177,100 @@ export const jsonStorage = {
   async deleteQuestion(id) {
     const db = read();
     db.questions = (db.questions || []).filter((q) => q.id !== id);
+    write(db);
+  },
+
+  // ----- Documents (uploaded PDFs) -----
+  async addDocument(doc) {
+    const db = read();
+    db.documents = [doc, ...(db.documents || [])];
+    write(db);
+    return doc;
+  },
+  async getDocuments() {
+    const db = read();
+    return db.documents || [];
+  },
+  async getDocument(id) {
+    const db = read();
+    return (db.documents || []).find((d) => d.id === id) || null;
+  },
+
+  // ----- Classes -----
+  async getClasses() {
+    const db = read();
+    return db.classes || [];
+  },
+  async getClass(id) {
+    const db = read();
+    return (db.classes || []).find((c) => c.id === id) || null;
+  },
+  async getClassByCode(code) {
+    const db = read();
+    const norm = String(code || "").trim().toUpperCase();
+    return (db.classes || []).find((c) => c.code.toUpperCase() === norm) || null;
+  },
+  async getClassesByTeacher(teacherId) {
+    const db = read();
+    return (db.classes || []).filter((c) => c.teacherId === teacherId);
+  },
+  async addClass(cls) {
+    const db = read();
+    db.classes = [cls, ...(db.classes || [])];
+    write(db);
+    return cls;
+  },
+
+  // ----- Memberships -----
+  async getMemberships() {
+    const db = read();
+    return db.memberships || [];
+  },
+  async getMembershipsByClass(classId) {
+    const db = read();
+    return (db.memberships || []).filter((m) => m.classId === classId);
+  },
+  async getMembershipsByStudent(studentId) {
+    const db = read();
+    return (db.memberships || []).filter((m) => m.studentId === studentId);
+  },
+  async addMembership(m) {
+    const db = read();
+    db.memberships = [m, ...(db.memberships || [])];
+    write(db);
+    return m;
+  },
+  async updateMembership(id, updates) {
+    const db = read();
+    const idx = (db.memberships || []).findIndex((m) => m.id === id);
+    if (idx === -1) return null;
+    db.memberships[idx] = { ...db.memberships[idx], ...updates, id };
+    write(db);
+    return db.memberships[idx];
+  },
+
+  // ----- Assignments (paper -> class) -----
+  async getAssignments() {
+    const db = read();
+    return db.assignments || [];
+  },
+  async getAssignmentsByClass(classId) {
+    const db = read();
+    return (db.assignments || []).filter((a) => a.classId === classId);
+  },
+  async getAssignmentsByPaper(paperId) {
+    const db = read();
+    return (db.assignments || []).filter((a) => a.paperId === paperId);
+  },
+  async addAssignment(a) {
+    const db = read();
+    db.assignments = [a, ...(db.assignments || [])];
+    write(db);
+    return a;
+  },
+  async deleteAssignment(id) {
+    const db = read();
+    db.assignments = (db.assignments || []).filter((a) => a.id !== id);
     write(db);
   },
 };

@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import express from "express";
+import { OAuth2Client } from "google-auth-library";
 import { jsonStorage } from "../storage/json.js";
 import { supabaseStorage } from "../storage/supabase.js";
 
 const router = express.Router();
 const storage = process.env.STORAGE === "supabase" ? supabaseStorage : jsonStorage;
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function sendAuthError(res, message, status = 400) {
   return res.status(status).json({ error: message });
@@ -47,20 +49,30 @@ async function ensureProfile(userId, email, googleData = null) {
 // Google OAuth callback
 router.post("/google", async (req, res) => {
   try {
-    const { googleData } = req.body;
-    if (!googleData || !googleData.email) {
-      return sendAuthError(res, "Invalid Google data.");
+    const { credential } = req.body;
+    if (!credential) {
+      return sendAuthError(res, "Invalid Google credential.");
     }
 
-    const email = googleData.email.trim().toLowerCase();
+    // Verify the Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return sendAuthError(res, "Invalid Google token.");
+    }
+
+    const email = payload.email.trim().toLowerCase();
     
     // Check if user with this email already exists
     const existingProfile = await storage.getProfileByEmail(email);
     const userId = existingProfile?.id || `u_${crypto.randomBytes(6).toString("hex")}`;
 
     const profile = await ensureProfile(userId, email, {
-      name: googleData.name,
-      picture: googleData.picture,
+      name: payload.name,
+      picture: payload.picture,
     });
 
     req.session.user = {

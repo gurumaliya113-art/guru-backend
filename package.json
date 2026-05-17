@@ -1,5 +1,5 @@
 {
-  "name": "smartprep-server",
+  "name": "gurutron-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -10,12 +10,16 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@napi-rs/canvas": "^1.0.0",
     "@supabase/supabase-js": "^2.36.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "express-session": "^1.19.0",
+    "google-auth-library": "^10.6.2",
+    "groq-sdk": "^0.7.0",
     "multer": "^2.1.1",
+    "mupdf": "^1.27.0",
     "pdf-parse": "^2.4.5"
   }
 }

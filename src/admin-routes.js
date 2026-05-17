@@ -1,13 +1,19 @@
 // Admin routes — mounted at /api/admin/* by server/src/index.js.
 import { Router } from "express";
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const { PDFParse } = require("pdf-parse");
 import crypto from "crypto";
 import { adminLogin, adminLogout, requireAdmin } from "./auth.js";
 import { parseHeuristic } from "./parsers/heuristic.js";
 import { parseWithGemini, isGeminiAvailable } from "./parsers/gemini.js";
+import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
+import { extractPdfPages } from "./parsers/pdf-extract.js";
+import { renderPagesToPng } from "./parsers/pdf-render.js";
+import {
+  savePdfBytes,
+  getPdfBytes,
+  savePageImage,
+  newDocumentId,
+} from "./storage/pdf-storage.js";
 
 const upload = multer({
   storage: multer.memoryStorage(), // we never persist the PDF — only its extracted text
@@ -38,7 +44,21 @@ export function buildAdminRouter(storage) {
   });
 
   r.get("/me", requireAdmin, (_req, res) => {
-    res.json({ ok: true, geminiAvailable: isGeminiAvailable() });
+    res.json({
+      ok: true,
+      geminiAvailable: isGeminiAvailable(),
+      groqAvailable: isGroqAvailable(),
+    });
+  });
+
+  // ---- Documents (uploaded PDFs metadata) ----
+  r.get("/documents", requireAdmin, async (_req, res) => {
+    try {
+      const documents = (await storage.getDocuments?.()) || [];
+      res.json({ documents });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
   });
 
   // ---- Stats ----
@@ -94,6 +114,10 @@ export function buildAdminRouter(storage) {
         board: q.board || undefined,
         isNCERT: typeof q.isNCERT === "boolean" ? q.isNCERT : false,
         source: q.source || "manual",
+        documentId: q.documentId || undefined,
+        pageNumber: Number.isInteger(q.pageNumber) && q.pageNumber > 0 ? q.pageNumber : undefined,
+        hasFigure: typeof q.hasFigure === "boolean" ? q.hasFigure : false,
+        pageImageUrl: q.pageImageUrl || undefined,
         createdAt: q.createdAt || new Date().toISOString(),
       }));
       const added = await storage.addQuestions(normalised);
@@ -122,39 +146,225 @@ export function buildAdminRouter(storage) {
     }
   });
 
-  // ---- PDF upload + parse ----
-  // POST /api/admin/parse-pdf  (multipart form-data, field "file", optional "mode")
-  // Returns: { questions: [...], textLength, parser, pageCount }
-  // mode = "heuristic" (default) | "ai"
+  // ---- PDF upload + parse (full pipeline) ----
+  // POST /api/admin/parse-pdf
+  //   multipart form-data, field "file"
+  //   optional: mode = "auto" (default) | "groq" | "gemini" | "heuristic"
+  //   optional: save = "1" (persist PDF + document + questions)  | "0" (preview only)
+  //   optional: subject, examType, classLevel, notes  (metadata for the document)
+  //
+  // Returns: { documentId?, parser, pageCount, textLength, isScanned, questions, saved }
   r.post("/parse-pdf", requireAdmin, upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No PDF uploaded (field: file)" });
-    try {
-      const parser = new PDFParse({ data: req.file.buffer });
-      const parsed = await parser.getText();
-      const text = parsed.text || "";
-      const mode = (req.body?.mode || req.query?.mode || "heuristic").toLowerCase();
 
-      let questions = [];
-      let parserUsed = "heuristic";
-      if (mode === "ai") {
-        if (!isGeminiAvailable()) {
-          return res.status(400).json({
-            error: "AI mode requested but GEMINI_API_KEY is not set in server/.env",
-          });
-        }
-        questions = await parseWithGemini(text);
-        parserUsed = "gemini-1.5-flash";
-      } else {
-        questions = parseHeuristic(text);
+    const requestedMode = (req.body?.mode || req.query?.mode || "auto").toLowerCase();
+    // saveQuestions: controls whether extracted questions are inserted into the bank.
+    //   default = false (preview mode — admin reviews, then clicks "Save All")
+    // The PDF bytes + documents row are ALWAYS persisted so the upload is tracked.
+    const saveQuestions = (req.body?.save ?? req.query?.save ?? "0").toString() === "1";
+    const meta = {
+      subject: req.body?.subject || null,
+      examType: req.body?.examType || null,
+      classLevel: req.body?.classLevel || null,
+      notes: req.body?.notes || null,
+    };
+
+    try {
+      // ---- 1. Extract text from PDF per-page (free, pdfjs-dist) ----
+      // Preserves Unicode subscripts and tags each page so the LLM can fill `pageNumber`.
+      const extracted = await extractPdfPages(req.file.buffer);
+      const text = extracted.fullText.trim();
+      const pageCount = extracted.pageCount;
+      const pagesHaveImages = extracted.pages.some((p) => p.hasImage);
+      // a PDF is "scanned" when nearly no text was extracted at all
+      const totalChars = extracted.pages.reduce((s, p) => s + (p.text?.length || 0), 0);
+      const isScanned = totalChars < 100;
+
+      if (isScanned) {
+        return res.status(422).json({
+          error: "This PDF appears to be scanned (no extractable text). OCR is not yet enabled — upload a digital/text PDF, or enable an OCR worker.",
+          isScanned: true,
+          pageCount,
+          textLength: text.length,
+        });
       }
 
-      res.json({
-        parser: parserUsed,
-        pageCount: parsed.numpages,
+      // ---- 2. Decide which parser to use ----
+      // auto: groq if available, else heuristic. Gemini only if explicitly asked.
+      let parserUsed;
+      let questions = [];
+      const tryGroq = async () => {
+        questions = await parseWithGroq(text);
+        parserUsed = "groq";
+      };
+      const tryHeuristic = () => {
+        questions = parseHeuristic(text);
+        parserUsed = "heuristic";
+      };
+      const tryGemini = async () => {
+        questions = await parseWithGemini(text);
+        parserUsed = "gemini";
+      };
+
+      if (requestedMode === "groq") {
+        await tryGroq();
+      } else if (requestedMode === "gemini" || requestedMode === "ai") {
+        if (!isGeminiAvailable()) {
+          return res.status(400).json({ error: "Gemini mode requested but GEMINI_API_KEY is not set." });
+        }
+        await tryGemini();
+      } else if (requestedMode === "heuristic") {
+        tryHeuristic();
+      } else {
+        // auto
+        if (isGroqAvailable()) {
+          try {
+            await tryGroq();
+            if (questions.length === 0) tryHeuristic();
+          } catch (e) {
+            console.warn("[parse-pdf] Groq failed, falling back to heuristic:", e.message);
+            tryHeuristic();
+          }
+        } else {
+          tryHeuristic();
+        }
+      }
+
+      // ---- 3. Always persist the PDF + documents row (so uploads are tracked) ----
+      const documentId = newDocumentId();
+      let storageInfo;
+      try {
+        storageInfo = await savePdfBytes({
+          id: documentId,
+          filename: req.file.originalname,
+          buffer: req.file.buffer,
+        });
+      } catch (e) {
+        console.error("[parse-pdf] PDF byte storage failed:", e.message);
+        return res.status(500).json({
+          error: `Failed to save PDF bytes: ${e.message}`,
+          parser: parserUsed,
+          questions,
+        });
+      }
+
+      const doc = {
+        id: documentId,
+        filename: req.file.originalname || "upload.pdf",
+        storagePath: storageInfo.path,
+        storageBackend: storageInfo.backend,
+        sizeBytes: storageInfo.sizeBytes,
+        pageCount,
         textLength: text.length,
-        questions,
+        isScanned: false,
+        parser: parserUsed,
+        status: "ready",
+        uploadedBy: req.session?.user?.id || null,
+        subject: meta.subject,
+        examType: meta.examType,
+        classLevel: meta.classLevel,
+        notes: meta.notes,
+        createdAt: new Date().toISOString(),
+      };
+      try {
+        await storage.addDocument?.(doc);
+      } catch (e) {
+        console.error("[parse-pdf] addDocument failed:", e.message);
+      }
+
+      // ---- 3b. Render & save PNG snapshots of pages that have figure-questions ----
+      // We snapshot only the pages where at least one question has hasFigure=true
+      // (or where the page itself contains an image). Saves ~10× space vs. all pages.
+      const figurePageSet = new Set();
+      for (const q of questions) {
+        if (q.hasFigure && Number.isInteger(q.pageNumber)) figurePageSet.add(q.pageNumber);
+      }
+      for (const p of extracted.pages) {
+        if (p.hasImage) figurePageSet.add(p.pageNumber);
+      }
+      const figurePages = [...figurePageSet];
+
+      const pageImageMap = {}; // pageNumber -> public URL
+      if (figurePages.length > 0) {
+        try {
+          console.log(`[parse-pdf] rendering ${figurePages.length} figure page(s):`, figurePages.join(", "));
+          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8);
+          console.log(`[parse-pdf] rendered ${rendered.size}/${figurePages.length} page(s), saving…`);
+          for (const [pageNumber, pngBuf] of rendered) {
+            try {
+              const saved = await savePageImage({ docId: documentId, pageNumber, buffer: pngBuf });
+              pageImageMap[pageNumber] = `/api/documents/${documentId}/pages/${pageNumber}.png`;
+              console.log(`[parse-pdf] saved page ${pageNumber} (${pngBuf.length} bytes) → ${saved.path}`);
+            } catch (e) {
+              console.warn(`[parse-pdf] savePageImage p${pageNumber} failed:`, e.message);
+            }
+          }
+        } catch (e) {
+          console.warn("[parse-pdf] page rendering failed:", e.message);
+        }
+      }
+
+      // Attach pageImageUrl to every question that has a saved snapshot
+      questions = questions.map((q) => {
+        const url = q.pageNumber ? pageImageMap[q.pageNumber] : null;
+        return url ? { ...q, pageImageUrl: url } : q;
+      });
+
+      // ---- 4. Optionally save extracted questions (only if save=1) ----
+      let questionsSaved = false;
+      if (saveQuestions && questions.length > 0) {
+        const linked = questions.map((q) => ({
+          ...q,
+          id: q.id || "q_" + crypto.randomBytes(4).toString("hex"),
+          documentId,
+          classLevel: q.classLevel || meta.classLevel || undefined,
+          createdAt: q.createdAt || new Date().toISOString(),
+        }));
+        try {
+          await storage.addQuestions(linked);
+          questionsSaved = true;
+        } catch (e) {
+          console.error("[parse-pdf] addQuestions failed:", e.message);
+        }
+      }
+
+      // Attach documentId to every returned question so the frontend can link them on Save All
+      const questionsOut = questions.map((q) => ({ ...q, documentId }));
+
+      res.json({
+        documentId,
+        parser: parserUsed,
+        pageCount,
+        textLength: text.length,
+        isScanned: false,
+        questionsCount: questions.length,
+        questions: questionsOut,
+        questionsSaved,
+        saved: true, // PDF + document row are always saved now
       });
     } catch (e) {
+      console.error("[parse-pdf] error:", e);
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // ---- Serve a saved PDF (for inline review of figure questions) ----
+  // GET /api/admin/documents/:id/pdf  — streams bytes inline
+  // Browsers can append #page=N to jump to a specific page.
+  r.get("/documents/:id/pdf", requireAdmin, async (req, res) => {
+    try {
+      const doc = await storage.getDocument?.(req.params.id);
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      const buf = await getPdfBytes(doc.storagePath, doc.storageBackend);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${(doc.filename || "document.pdf").replace(/[^\w.\-]+/g, "_")}"`
+      );
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.send(buf);
+    } catch (e) {
+      console.error("[documents/:id/pdf] error:", e);
       res.status(500).json({ error: String(e.message || e) });
     }
   });

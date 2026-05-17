@@ -19,7 +19,7 @@ function mintToken() {
 }
 
 export function adminLogin(email, password) {
-  const expectedEmail = process.env.ADMIN_EMAIL || "admin@smartprep.local";
+  const expectedEmail = process.env.ADMIN_EMAIL || "admin@gurutron.local";
   const expectedPassword = process.env.ADMIN_PASSWORD || "changeme";
   if (!email || !password) return null;
   if (email.trim().toLowerCase() !== expectedEmail.toLowerCase()) return null;
@@ -36,7 +36,8 @@ export function isValidAdminToken(token) {
 }
 
 export function requireAdmin(req, res, next) {
-  const token = req.header("x-admin-token");
+  // Accept token from header (default) OR query string (for iframes / <embed> / direct browser GETs)
+  const token = req.header("x-admin-token") || req.query?.token;
   if (!isValidAdminToken(token)) {
     return res.status(401).json({ error: "Admin authentication required" });
   }
