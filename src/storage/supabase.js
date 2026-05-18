@@ -125,14 +125,39 @@ export const supabaseStorage = {
   },
 
   async addPaper(userId, paper) {
-    const dbPayload = toSnakeCase({ user_id: userId, ...paper });
+    // Whitelist: only persist columns that exist on the `papers` table.
+    // The frontend may send extras (e.g. `skipHeader`) which would otherwise
+    // make the INSERT fail with PGRST204 and lose the paper silently.
+    const ALLOWED = new Set([
+      "id",
+      "user_id",
+      "title",
+      "exam_type",
+      "subject",
+      "topic",
+      "difficulty",
+      "questions",
+      "created_at",
+    ]);
+    const raw = toSnakeCase({ user_id: userId, ...paper });
+    const dbPayload = Object.fromEntries(
+      Object.entries(raw).filter(([k]) => ALLOWED.has(k))
+    );
     const { data, error } = await supabase
       .from("papers")
       .insert([dbPayload])
       .select()
       .single();
     handleError(error);
-    return data ? toCamelCase(data) : null;
+    // Re-attach client-only fields (e.g. skipHeader) so the API response
+    // matches what the frontend sent, even though they aren't persisted.
+    const persisted = data ? toCamelCase(data) : null;
+    if (persisted && paper && typeof paper === "object") {
+      for (const [k, v] of Object.entries(paper)) {
+        if (!(k in persisted)) persisted[k] = v;
+      }
+    }
+    return persisted;
   },
 
   async deletePaper(userId, paperId) {
