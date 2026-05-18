@@ -124,6 +124,19 @@ export const supabaseStorage = {
     return data ? data.map(toCamelCase) : [];
   },
 
+  // Look up a paper by id without scoping to a user. Used by the
+  // GET /api/papers/:id route which authorizes the caller separately
+  // (owner OR approved member of a class the paper is assigned to).
+  async getPaperById(paperId) {
+    const { data, error } = await supabase
+      .from("papers")
+      .select("*")
+      .eq("id", paperId)
+      .maybeSingle();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
   async addPaper(userId, paper) {
     // Whitelist: only persist columns that exist on the `papers` table.
     // The frontend may send extras (e.g. `skipHeader`) which would otherwise

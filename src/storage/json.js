@@ -118,6 +118,16 @@ export const jsonStorage = {
     write(db);
     return paper;
   },
+  // Cross-user lookup by id. Used by GET /api/papers/:id, which then
+  // authorizes the caller (owner OR approved-class-member) separately.
+  async getPaperById(paperId) {
+    const db = read();
+    for (const list of Object.values(db.papers || {})) {
+      const found = (list || []).find((p) => p.id === paperId);
+      if (found) return found;
+    }
+    return null;
+  },
   async deletePaper(userId, paperId) {
     const db = read();
     db.papers[userId] = (db.papers[userId] || []).filter((p) => p.id !== paperId);

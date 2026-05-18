@@ -246,6 +246,43 @@ app.post("/api/papers", requireAuth, async (req, res) => {
   }
 });
 
+// Fetch a single paper by id. Authorized for:
+//   1) the teacher who owns the paper, OR
+//   2) any student with an APPROVED membership in a class to which this
+//      paper has been assigned.
+// Without this, students hitting /paper/:id (from the assignments feed)
+// would see "Paper not found" because their local cache only contains
+// papers they themselves authored.
+app.get("/api/papers/:id", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  try {
+    const paper = await storage.getPaperById(req.params.id);
+    if (!paper) return res.status(404).json({ error: "Paper not found" });
+
+    const userId = user.id.toString();
+    const ownerId = (paper.userId || paper.user_id || "").toString();
+    if (ownerId === userId) {
+      return res.json({ paper });
+    }
+
+    // Student path: check membership ↔ assignment overlap.
+    const [assignments, memberships] = await Promise.all([
+      storage.getAssignmentsByPaper(req.params.id),
+      storage.getMembershipsByStudent(userId),
+    ]);
+    const approvedClassIds = new Set(
+      memberships.filter((m) => m.status === "approved").map((m) => m.classId)
+    );
+    const hasAccess = assignments.some((a) => approvedClassIds.has(a.classId));
+    if (!hasAccess) return res.status(403).json({ error: "Not allowed" });
+
+    res.json({ paper });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 app.delete("/api/papers/:id", requireAuth, async (req, res) => {
   const user = getCurrentUser(req, res);
   if (!user) return;
