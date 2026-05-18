@@ -5,11 +5,14 @@ import express from "express";
 import cors from "cors";
 import session from "express-session";
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
 import authRoutes from "./routes/auth.js";
 import { jsonStorage } from "./storage/json.js";
 import { supabaseStorage } from "./storage/supabase.js";
 import { buildAdminRouter } from "./admin-routes.js";
 import { getPageImageBytes } from "./storage/pdf-storage.js";
+import { saveCaptureImage, CAPTURES_LOCAL_DIR } from "./storage/capture-storage.js";
 import { hashPassword } from "./password.js";
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
@@ -245,6 +248,112 @@ app.post("/api/papers", requireAuth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+
+// ---- Captured-paper upload (teacher snaps photos of handwritten /
+// printed questions and turns them into an image-only paper). The paper
+// row stored here is a regular `papers` row — we just stash each image as
+// a synthetic "question" with `pageImageUrl` set and `options=[]`. That
+// way the entire downstream pipeline (assignment, student feed, PaperView,
+// print/PDF) keeps working without any other code changes.
+const captureUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 20 }, // 8 MB / image, max 20 images
+  fileFilter: (_req, file, cb) => {
+    if ((file.mimetype || "").startsWith("image/")) return cb(null, true);
+    cb(new Error("Only image uploads are allowed"));
+  },
+});
+
+app.post(
+  "/api/papers/capture",
+  requireAuth,
+  captureUpload.array("images", 20),
+  async (req, res) => {
+    const user = getCurrentUser(req, res);
+    if (!user) return;
+    try {
+      const files = Array.isArray(req.files) ? req.files : [];
+      if (files.length === 0) {
+        return res.status(400).json({ error: "At least one image is required" });
+      }
+      const title = String(req.body.title || "").trim() || "Captured paper";
+      const examType = String(req.body.examType || "Board").trim();
+      const subject = String(req.body.subject || "").trim();
+      const topic = String(req.body.topic || "All").trim() || "All";
+      const difficulty = String(req.body.difficulty || "Moderate").trim();
+
+      const paperId = `cap_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+      // Upload every image in parallel.
+      const urls = await Promise.all(
+        files.map((f, i) =>
+          saveCaptureImage({
+            paperId,
+            index: i,
+            buffer: f.buffer,
+            mimetype: f.mimetype,
+          })
+        )
+      );
+
+      // Synthesize one image-only "question" per uploaded photo so the
+      // existing PaperView + print/PDF flow renders them automatically.
+      const questions = urls.map((url, i) => ({
+        id: `${paperId}_q${i + 1}`,
+        text: "",
+        options: [],
+        correctIndex: 0,
+        topic: topic || "All",
+        difficulty: difficulty || "Moderate",
+        explanation: "",
+        pageImageUrl: url,
+        subject: subject || "",
+        examType: examType || "Board",
+      }));
+
+      const paper = {
+        id: paperId,
+        title,
+        examType,
+        subject,
+        topic,
+        difficulty,
+        questions,
+        createdAt: new Date().toISOString(),
+      };
+
+      const saved = await storage.addPaper(user.id.toString(), paper);
+      res.json({ paper: saved || paper });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  }
+);
+
+// Multer error handler scoped just to the capture upload — catches "file
+// too big" / "wrong mime" so the client gets a clean JSON error.
+app.use("/api/papers/capture", (err, _req, res, next) => {
+  if (err) return res.status(400).json({ error: String(err.message || err) });
+  next();
+});
+
+// Static-serve locally-stored capture images when STORAGE !== "supabase".
+// On Supabase mode, images are served directly from the public bucket URL.
+app.use(
+  "/api/captures",
+  express.static(CAPTURES_LOCAL_DIR, {
+    fallthrough: true,
+    maxAge: "1y",
+    setHeaders: (res, filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      const mime = ext === ".png" ? "image/png"
+        : ext === ".webp" ? "image/webp"
+        : ext === ".gif" ? "image/gif"
+        : "image/jpeg";
+      res.setHeader("Content-Type", mime);
+    },
+  })
+);
 
 // Fetch a single paper by id. Authorized for:
 //   1) the teacher who owns the paper, OR
