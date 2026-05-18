@@ -18,6 +18,7 @@ const DEFAULT_DB = {
   memberships: [],  // Membership[]
   assignments: [],  // Assignment[]  — paper assigned to class
   topics: [],       // Topic[]       — { id, subject, classLevel?, examType?, name, createdAt }
+  pyps: [],         // PreviousYearPaper[] — { id, title, examType, year, subject?, durationMinutes?, questions[], createdAt }
 };
 
 function ensureFile() {
@@ -319,6 +320,39 @@ export const jsonStorage = {
   async deleteTopic(id) {
     const db = read();
     db.topics = (db.topics || []).filter((t) => t.id !== id);
+    write(db);
+  },
+
+  // ----- Previous Year Papers / Mocks (admin-curated, global) -----
+  // We strip the question payload off list endpoints because PYPs can be
+  // hundreds of questions; the student app fetches the full detail only
+  // when a specific PYP is opened.
+  async getPyps() {
+    const db = read();
+    return (db.pyps || []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      examType: p.examType,
+      year: p.year,
+      subject: p.subject,
+      durationMinutes: p.durationMinutes,
+      questionCount: Array.isArray(p.questions) ? p.questions.length : 0,
+      createdAt: p.createdAt,
+    }));
+  },
+  async getPyp(id) {
+    const db = read();
+    return (db.pyps || []).find((p) => p.id === id) || null;
+  },
+  async addPyp(pyp) {
+    const db = read();
+    db.pyps = [pyp, ...(db.pyps || [])];
+    write(db);
+    return pyp;
+  },
+  async deletePyp(id) {
+    const db = read();
+    db.pyps = (db.pyps || []).filter((p) => p.id !== id);
     write(db);
   },
 };

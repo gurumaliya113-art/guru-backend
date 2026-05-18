@@ -411,4 +411,57 @@ export const supabaseStorage = {
     const { error } = await supabase.from("topics").delete().eq("id", id);
     handleError(error);
   },
+
+  // ----- Previous Year Papers / Mocks -----
+  // Schema (see supabase-pyp-migration.sql):
+  //   pyps(id text pk, title text, exam_type text, year int, subject text,
+  //        duration_minutes int, questions jsonb, created_at timestamptz)
+  async getPyps() {
+    const { data, error } = await supabase
+      .from("pyps")
+      .select("id,title,exam_type,year,subject,duration_minutes,questions,created_at")
+      .order("created_at", { ascending: false });
+    // PostgREST surfaces "missing table" as PGRST205 / 42P01. Treat that as
+    // an empty catalogue so the student page renders cleanly until the
+    // operator runs `supabase-pyp-migration.sql`.
+    if (error && (error.code === "PGRST205" || error.code === "42P01")) {
+      console.warn("[storage:supabase] pyps table missing — run supabase-pyp-migration.sql");
+      return [];
+    }
+    handleError(error);
+    return (data || []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      examType: row.exam_type,
+      year: row.year,
+      subject: row.subject,
+      durationMinutes: row.duration_minutes,
+      questionCount: Array.isArray(row.questions) ? row.questions.length : 0,
+      createdAt: row.created_at,
+    }));
+  },
+  async getPyp(id) {
+    const { data, error } = await supabase.from("pyps").select("*").eq("id", id).single();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+  async addPyp(pyp) {
+    const payload = toSnakeCase({
+      id: pyp.id,
+      title: pyp.title,
+      examType: pyp.examType,
+      year: pyp.year,
+      subject: pyp.subject ?? null,
+      durationMinutes: pyp.durationMinutes ?? null,
+      questions: pyp.questions,
+      createdAt: pyp.createdAt,
+    });
+    const { data, error } = await supabase.from("pyps").insert(payload).select().single();
+    handleError(error);
+    return data ? toCamelCase(data) : pyp;
+  },
+  async deletePyp(id) {
+    const { error } = await supabase.from("pyps").delete().eq("id", id);
+    handleError(error);
+  },
 };

@@ -183,6 +183,66 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ---- Previous Year Papers / Mocks (admin upload) ----
+  // Admin creates a PYP by sending the full questions array. We don't try
+  // to parse PDFs here — the regular /parse-pdf flow already extracts
+  // questions; the admin can review them and then POST the resulting
+  // array into this endpoint to wrap them up as a "previous year paper".
+  r.get("/pyp", requireAdmin, async (_req, res) => {
+    try {
+      const pyps = await storage.getPyps();
+      res.json({ pyps });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.post("/pyp", requireAdmin, async (req, res) => {
+    try {
+      const { title, examType, year, subject, durationMinutes, questions } = req.body || {};
+      if (!title || !String(title).trim()) {
+        return res.status(400).json({ error: "title is required" });
+      }
+      if (!examType || !["NEET", "JEE", "BOARD"].includes(String(examType).toUpperCase())) {
+        return res.status(400).json({ error: "examType must be NEET / JEE / BOARD" });
+      }
+      const y = Number(year);
+      if (!Number.isInteger(y) || y < 1990 || y > 2100) {
+        return res.status(400).json({ error: "year must be a valid 4-digit year" });
+      }
+      if (!Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ error: "questions[] must be a non-empty array" });
+      }
+
+      const pyp = {
+        id: `pyp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        title: String(title).trim(),
+        examType: String(examType).toUpperCase(),
+        year: y,
+        subject: subject ? String(subject).trim() : undefined,
+        durationMinutes:
+          durationMinutes != null && Number.isFinite(Number(durationMinutes))
+            ? Number(durationMinutes)
+            : undefined,
+        questions,
+        createdAt: new Date().toISOString(),
+      };
+      await storage.addPyp(pyp);
+      res.json({ pyp });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.delete("/pyp/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deletePyp(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   r.delete("/questions/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteQuestion(req.params.id);

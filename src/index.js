@@ -4,6 +4,7 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import session from "express-session";
+import crypto from "crypto";
 import authRoutes from "./routes/auth.js";
 import { jsonStorage } from "./storage/json.js";
 import { supabaseStorage } from "./storage/supabase.js";
@@ -544,6 +545,8 @@ app.delete("/api/assignments/:id", requireAuth, async (req, res) => {
 });
 
 // Student: list papers assigned to me (via my approved memberships).
+// We hydrate each row with the assigning teacher's display name so the
+// home-feed can render "Manoj sir uploaded …" without an extra round-trip.
 app.get("/api/assignments/for-me", requireAuth, async (req, res) => {
   const user = getCurrentUser(req, res);
   if (!user) return;
@@ -555,7 +558,180 @@ app.get("/api/assignments/for-me", requireAuth, async (req, res) => {
     const all = await storage.getAssignments();
     const myClassIds = new Set(approved.map((m) => m.classId));
     const mine = all.filter((a) => myClassIds.has(a.classId));
-    res.json({ assignments: mine });
+
+    // Resolve assigning teacher names. Cache per teacher so we don't hit
+    // storage repeatedly when one teacher has many assignments.
+    const nameCache = new Map();
+    const hydrated = await Promise.all(
+      mine.map(async (a) => {
+        if (!a.assignedBy) return a;
+        if (!nameCache.has(a.assignedBy)) {
+          try {
+            const p = await storage.getProfile(a.assignedBy);
+            nameCache.set(a.assignedBy, p?.name || null);
+          } catch {
+            nameCache.set(a.assignedBy, null);
+          }
+        }
+        return { ...a, assignedByName: nameCache.get(a.assignedBy) || undefined };
+      }),
+    );
+
+    res.json({ assignments: hydrated });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// --- Previous Year Papers / Mocks (public read, admin write) ---
+// Listing strips the questions array so the catalogue stays light. The
+// detail endpoint returns the full payload, but enforces the free-tier
+// limit (first 5 PYPs free, rest paywalled) for non-subscribed users.
+app.get("/api/pyp", async (_req, res) => {
+  try {
+    const pyps = (await storage.getPyps?.()) || [];
+    res.json({ pyps });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/pyp/:id", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  try {
+    const all = (await storage.getPyps?.()) || [];
+    const list = [...all].sort((a, b) => {
+      const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+      return ta - tb; // oldest first so "first 5" is stable
+    });
+    const idx = list.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: "PYP not found" });
+
+    // Paywall: students get the first 5 PYPs free, after that they need an
+    // active subscription. Profile.subscription = { active: bool, ... }.
+    const profile = await storage.getProfile(user.id.toString());
+    const subscribed = profile?.subscription?.active === true;
+    if (idx >= 5 && !subscribed) {
+      return res.status(402).json({
+        error: "Subscription required",
+        code: "PAYWALL",
+        freeQuota: 5,
+        message: "First 5 papers / mocks are free. Subscribe to unlock the rest.",
+      });
+    }
+
+    const pyp = await storage.getPyp(req.params.id);
+    if (!pyp) return res.status(404).json({ error: "PYP not found" });
+    res.json({ pyp });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// --- Razorpay subscription payments ---
+// Three small endpoints implement the standard Razorpay Standard Checkout
+// dance. We do NOT use the razorpay npm SDK — a) avoid adding a dep, b)
+// the REST API is two HTTP calls and signature verification is one HMAC.
+//   1. /api/payments/config        → public, returns the publishable key + plan amount
+//   2. /api/payments/create-order  → auth, creates an order at Razorpay, returns order_id
+//   3. /api/payments/verify        → auth, verifies signature, flips profile.subscription
+//
+// We pull the actual key / amount from env so the values stay out of git.
+const RZP_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
+const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
+const RZP_AMOUNT = parseInt(process.env.RAZORPAY_PLAN_AMOUNT_PAISE || "4900", 10);
+const RZP_CURRENCY = process.env.RAZORPAY_PLAN_CURRENCY || "INR";
+const RZP_VALIDITY_DAYS = parseInt(process.env.RAZORPAY_PLAN_VALIDITY_DAYS || "365", 10);
+
+function razorpayConfigured() {
+  return !!(RZP_KEY_ID && RZP_KEY_SECRET);
+}
+
+app.get("/api/payments/config", (_req, res) => {
+  res.json({
+    configured: razorpayConfigured(),
+    keyId: RZP_KEY_ID || null,
+    amount: RZP_AMOUNT,
+    currency: RZP_CURRENCY,
+    plan: "yearly-49",
+  });
+});
+
+app.post("/api/payments/create-order", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  if (!razorpayConfigured()) {
+    return res.status(503).json({ error: "Razorpay is not configured on the server." });
+  }
+
+  try {
+    const auth = "Basic " + Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString("base64");
+    // Razorpay receipt must be <= 40 chars. user.id may be long; truncate.
+    const receipt = `s_${String(user.id).slice(0, 20)}_${Date.now().toString(36)}`;
+    const r = await fetch("https://api.razorpay.com/v1/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: JSON.stringify({
+        amount: RZP_AMOUNT,
+        currency: RZP_CURRENCY,
+        receipt,
+        notes: { userId: String(user.id), plan: "yearly-49" },
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      console.error("[razorpay] create-order failed:", data);
+      return res.status(502).json({ error: data?.error?.description || "Failed to create order" });
+    }
+    res.json({
+      orderId: data.id,
+      amount: data.amount,
+      currency: data.currency,
+      keyId: RZP_KEY_ID,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.post("/api/payments/verify", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  if (!razorpayConfigured()) {
+    return res.status(503).json({ error: "Razorpay is not configured on the server." });
+  }
+
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: "Missing payment fields" });
+  }
+
+  // Signature = HMAC-SHA256(order_id + "|" + payment_id, key_secret)
+  const expected = crypto
+    .createHmac("sha256", RZP_KEY_SECRET)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+  if (expected !== razorpay_signature) {
+    return res.status(400).json({ error: "Signature mismatch — payment not verified" });
+  }
+
+  // Persist the subscription on the user's profile.
+  try {
+    const profile = (await storage.getProfile(user.id.toString())) || {};
+    const validUntil = new Date(Date.now() + RZP_VALIDITY_DAYS * 86400 * 1000).toISOString();
+    const updated = {
+      ...profile,
+      subscription: {
+        active: true,
+        plan: "yearly-49",
+        validUntil,
+        razorpayPaymentId: razorpay_payment_id,
+      },
+    };
+    await storage.saveProfile(user.id.toString(), updated);
+    res.json({ ok: true, subscription: updated.subscription });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
