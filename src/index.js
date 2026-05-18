@@ -75,6 +75,18 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, storage: process.env.STORAGE || "json" });
 });
 
+// Public: read-only topics catalogue. The admin manages topics via the admin
+// panel; the teacher's Paper Generation flow reads from the same source so
+// both stay in sync without any client-side duplication.
+app.get("/api/topics", async (_req, res) => {
+  try {
+    const topics = (await storage.getTopics?.()) || [];
+    res.json({ topics });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 // Public: read-only questions catalogue used by the student app (quizzes, paper gen).
 app.get("/api/questions", async (_req, res) => {
   try {

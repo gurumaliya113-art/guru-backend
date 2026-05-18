@@ -374,4 +374,41 @@ export const supabaseStorage = {
     const { error } = await supabase.from("assignments").delete().eq("id", id);
     handleError(error);
   },
+
+  // ----- Topics (admin-managed catalogue, surfaced in PaperGenerate) -----
+  async getTopics() {
+    const { data, error } = await supabase
+      .from("topics")
+      .select("*")
+      .order("created_at", { ascending: false });
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
+  },
+  async addTopic(topic) {
+    const dbPayload = toSnakeCase(topic);
+    // Upsert with the unique constraint on (subject, class_level, exam_type, name)
+    // — if the row already exists we just return it instead of erroring out.
+    const { data, error } = await supabase
+      .from("topics")
+      .upsert([dbPayload], { onConflict: "id" })
+      .select()
+      .single();
+    if (error) {
+      // Duplicate against the case-insensitive unique index — fetch the existing
+      // row so callers always get a valid topic back.
+      const { data: existing } = await supabase
+        .from("topics")
+        .select("*")
+        .ilike("subject", topic.subject)
+        .ilike("name", topic.name)
+        .maybeSingle();
+      if (existing) return toCamelCase(existing);
+      handleError(error);
+    }
+    return data ? toCamelCase(data) : null;
+  },
+  async deleteTopic(id) {
+    const { error } = await supabase.from("topics").delete().eq("id", id);
+    handleError(error);
+  },
 };

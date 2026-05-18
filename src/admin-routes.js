@@ -137,6 +137,52 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ---- Topics catalogue ----
+  // Admin-managed list of topics that surfaces in the teacher's Paper
+  // Generation flow. Storing topics independently of questions lets admins
+  // pre-seed a syllabus before any questions exist for it.
+  r.get("/topics", requireAdmin, async (_req, res) => {
+    try {
+      const topics = await storage.getTopics();
+      res.json({ topics });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.post("/topics", requireAdmin, async (req, res) => {
+    try {
+      const { subject, name, classLevel, examType } = req.body || {};
+      if (!subject || !String(subject).trim()) {
+        return res.status(400).json({ error: "subject is required" });
+      }
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: "name is required" });
+      }
+      const topic = {
+        id: `t_${crypto.randomBytes(6).toString("hex")}`,
+        subject: String(subject).trim(),
+        name: String(name).trim(),
+        classLevel: classLevel ? String(classLevel).trim() : null,
+        examType: examType ? String(examType).trim() : null,
+        createdAt: new Date().toISOString(),
+      };
+      const saved = await storage.addTopic(topic);
+      res.json({ topic: saved });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.delete("/topics/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteTopic(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   r.delete("/questions/:id", requireAdmin, async (req, res) => {
     try {
       await storage.deleteQuestion(req.params.id);

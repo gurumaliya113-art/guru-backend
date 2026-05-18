@@ -17,6 +17,7 @@ const DEFAULT_DB = {
   classes: [],      // ClassRoom[]
   memberships: [],  // Membership[]
   assignments: [],  // Assignment[]  — paper assigned to class
+  topics: [],       // Topic[]       — { id, subject, classLevel?, examType?, name, createdAt }
 };
 
 function ensureFile() {
@@ -290,6 +291,34 @@ export const jsonStorage = {
   async deleteAssignment(id) {
     const db = read();
     db.assignments = (db.assignments || []).filter((a) => a.id !== id);
+    write(db);
+  },
+
+  // ----- Topics (admin-managed catalogue, surfaced in PaperGenerate) -----
+  async getTopics() {
+    const db = read();
+    return db.topics || [];
+  },
+  async addTopic(topic) {
+    const db = read();
+    const list = db.topics || [];
+    // Case-insensitive uniqueness on (subject, classLevel, examType, name)
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const dup = list.find(
+      (t) =>
+        norm(t.subject) === norm(topic.subject) &&
+        norm(t.classLevel) === norm(topic.classLevel) &&
+        norm(t.examType) === norm(topic.examType) &&
+        norm(t.name) === norm(topic.name),
+    );
+    if (dup) return dup;
+    db.topics = [topic, ...list];
+    write(db);
+    return topic;
+  },
+  async deleteTopic(id) {
+    const db = read();
+    db.topics = (db.topics || []).filter((t) => t.id !== id);
     write(db);
   },
 };
