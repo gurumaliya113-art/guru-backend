@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { supabase } from "../supabase.js";
 
 function handleError(error) {
@@ -245,6 +246,24 @@ export const supabaseStorage = {
       .single();
     handleError(error);
     return data ? toCamelCase(data) : null;
+  },
+  async savePdfPages({ pdfName, pages }) {
+    if (!Array.isArray(pages) || pages.length === 0) return [];
+    const dbPayload = pages.map((page) =>
+      toSnakeCase({
+        id: crypto.randomUUID(),
+        pdfName,
+        pageNumber: page.pageNumber,
+        content: page.text,
+        createdAt: new Date().toISOString(),
+      })
+    );
+    const { data, error } = await supabase
+      .from("pdf_pages")
+      .insert(dbPayload)
+      .select();
+    handleError(error);
+    return data ? data.map(toCamelCase) : [];
   },
   async getDocuments() {
     const { data, error } = await supabase

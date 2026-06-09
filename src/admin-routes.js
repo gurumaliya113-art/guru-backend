@@ -7,6 +7,7 @@ import { parseHeuristic } from "./parsers/heuristic.js";
 import { parseWithGemini, isGeminiAvailable } from "./parsers/gemini.js";
 import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
 import { extractPdfPages } from "./parsers/pdf-extract.js";
+import { extractRawPdfPages } from "./parsers/pdf-raw.js";
 import { renderPagesToPng } from "./parsers/pdf-render.js";
 import {
   savePdfBytes,
@@ -276,9 +277,13 @@ export function buildAdminRouter(storage) {
     };
 
     try {
-      // ---- 1. Extract text from PDF per-page (free, pdfjs-dist) ----
-      // Preserves Unicode subscripts and tags each page so the LLM can fill `pageNumber`.
-      const extracted = await extractPdfPages(req.file.buffer);
+      // ---- 1. Extract text from PDF per-page ----
+      // Raw mode uses pdf-parse instead of the default PDF.js extractor.
+      console.log(`[parse-pdf] Starting extraction with mode: ${requestedMode}`);
+      const extracted = requestedMode === "raw"
+        ? await extractRawPdfPages(req.file.buffer)
+        : await extractPdfPages(req.file.buffer);
+      console.log(`[parse-pdf] Extraction complete: ${extracted.pageCount} pages, ${extracted.textLength} chars`);
       const text = extracted.fullText.trim();
       const pageCount = extracted.pageCount;
       const pagesHaveImages = extracted.pages.some((p) => p.hasImage);
@@ -311,6 +316,10 @@ export function buildAdminRouter(storage) {
         questions = await parseWithGemini(text);
         parserUsed = "gemini";
       };
+      const tryRaw = () => {
+        questions = parseHeuristic(text);
+        parserUsed = "raw";
+      };
 
       if (requestedMode === "groq") {
         await tryGroq();
@@ -321,6 +330,8 @@ export function buildAdminRouter(storage) {
         await tryGemini();
       } else if (requestedMode === "heuristic") {
         tryHeuristic();
+      } else if (requestedMode === "raw") {
+        tryRaw();
       } else {
         // auto
         if (isGroqAvailable()) {
@@ -352,6 +363,17 @@ export function buildAdminRouter(storage) {
           parser: parserUsed,
           questions,
         });
+      }
+
+      if (requestedMode === "raw") {
+        try {
+          await storage.savePdfPages?.({
+            pdfName: req.file.originalname || "upload.pdf",
+            pages: extracted.pages,
+          });
+        } catch (e) {
+          console.warn("[parse-pdf] savePdfPages failed:", e.message);
+        }
       }
 
       const doc = {

@@ -29,7 +29,8 @@ app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin / curl (no origin header) and any explicitly whitelisted origin.
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`Origin ${origin} not allowed by CORS`));
+    // Reject CORS properly (don't throw error which becomes 500)
+    cb(null, false);
   },
   credentials: true,
 }));

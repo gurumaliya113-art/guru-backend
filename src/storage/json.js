@@ -14,6 +14,7 @@ const DEFAULT_DB = {
   papers: {},       // userId -> GeneratedPaper[]
   questions: [],    // Question[] — global, managed by admin
   documents: [],    // Document[] — uploaded PDF metadata
+  pdfPages: [],     // Raw PDF pages extracted when using the new raw parser
   classes: [],      // ClassRoom[]
   memberships: [],  // Membership[]
   assignments: [],  // Assignment[]  — paper assigned to class
