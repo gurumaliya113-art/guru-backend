@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { supabase } from "../supabase.js";
+import { jsonStorage } from "./json.js";
 
 function handleError(error) {
   if (error) throw error;
@@ -467,6 +468,60 @@ export const supabaseStorage = {
   async deleteTopic(id) {
     const { error } = await supabase.from("topics").delete().eq("id", id);
     handleError(error);
+  },
+
+  // ----- Flashcards (admin-managed deck data) -----
+  async getFlashcards() {
+    try {
+      const { data, error } = await supabase
+        .from("flashcards")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error && (error.code === "PGRST205" || error.code === "42P01")) {
+        return await jsonStorage.getFlashcards();
+      }
+      handleError(error);
+      return data ? data.map(toCamelCase) : [];
+    } catch (e) {
+      if (String(e?.code || e).includes("PGRST205") || String(e).includes("flashcards")) {
+        return await jsonStorage.getFlashcards();
+      }
+      throw e;
+    }
+  },
+  async addFlashcard(card) {
+    try {
+      const dbPayload = toSnakeCase(card);
+      const { data, error } = await supabase
+        .from("flashcards")
+        .insert([dbPayload])
+        .select()
+        .single();
+      if (error && (error.code === "PGRST205" || error.code === "42P01")) {
+        return await jsonStorage.addFlashcard(card);
+      }
+      handleError(error);
+      return data ? toCamelCase(data) : card;
+    } catch (e) {
+      if (String(e?.code || e).includes("PGRST205") || String(e).includes("flashcards")) {
+        return await jsonStorage.addFlashcard(card);
+      }
+      throw e;
+    }
+  },
+  async deleteFlashcard(id) {
+    try {
+      const { error } = await supabase.from("flashcards").delete().eq("id", id);
+      if (error && (error.code === "PGRST205" || error.code === "42P01")) {
+        return await jsonStorage.deleteFlashcard(id);
+      }
+      handleError(error);
+    } catch (e) {
+      if (String(e?.code || e).includes("PGRST205") || String(e).includes("flashcards")) {
+        return await jsonStorage.deleteFlashcard(id);
+      }
+      throw e;
+    }
   },
 
   // ----- Previous Year Papers / Mocks -----

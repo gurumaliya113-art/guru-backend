@@ -19,6 +19,7 @@ const DEFAULT_DB = {
   memberships: [],  // Membership[]
   assignments: [],  // Assignment[]  — paper assigned to class
   topics: [],       // Topic[]       — { id, subject, classLevel?, examType?, name, createdAt }
+  flashcards: [],   // Flashcard[]   — { id, subject, topic, classLevel?, examType?, question, answer, difficulty?, createdAt }
   pyps: [],         // PreviousYearPaper[] — { id, title, examType, year, subject?, durationMinutes?, questions[], createdAt }
 };
 
@@ -331,6 +332,23 @@ export const jsonStorage = {
   async deleteTopic(id) {
     const db = read();
     db.topics = (db.topics || []).filter((t) => t.id !== id);
+    write(db);
+  },
+
+  // ----- Flashcards (admin-managed deck data for the student app) -----
+  async getFlashcards() {
+    const db = read();
+    return db.flashcards || [];
+  },
+  async addFlashcard(card) {
+    const db = read();
+    db.flashcards = [card, ...(db.flashcards || [])];
+    write(db);
+    return card;
+  },
+  async deleteFlashcard(id) {
+    const db = read();
+    db.flashcards = (db.flashcards || []).filter((c) => c.id !== id);
     write(db);
   },
 

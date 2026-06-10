@@ -201,6 +201,50 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ---- Flashcards deck management ----
+  r.get("/flashcards", requireAdmin, async (_req, res) => {
+    try {
+      const flashcards = await storage.getFlashcards?.() || [];
+      res.json({ flashcards });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.post("/flashcards", requireAdmin, async (req, res) => {
+    try {
+      const { subject, topic, classLevel, examType, question, answer, difficulty } = req.body || {};
+      if (!subject || !String(subject).trim()) return res.status(400).json({ error: "subject is required" });
+      if (!topic || !String(topic).trim()) return res.status(400).json({ error: "topic is required" });
+      if (!question || !String(question).trim()) return res.status(400).json({ error: "question is required" });
+      if (!answer || !String(answer).trim()) return res.status(400).json({ error: "answer is required" });
+      const card = {
+        id: `fc_${crypto.randomBytes(6).toString("hex")}`,
+        subject: String(subject).trim(),
+        topic: String(topic).trim(),
+        classLevel: classLevel ? String(classLevel).trim() : null,
+        examType: examType ? String(examType).trim() : null,
+        question: String(question).trim(),
+        answer: String(answer).trim(),
+        difficulty: difficulty ? String(difficulty).trim() : "Moderate",
+        createdAt: new Date().toISOString(),
+      };
+      const saved = await storage.addFlashcard(card);
+      res.json({ flashcard: saved });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.delete("/flashcards/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteFlashcard?.(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   // ---- Previous Year Papers / Mocks (admin upload) ----
   // Admin creates a PYP by sending the full questions array. We don't try
   // to parse PDFs here — the regular /parse-pdf flow already extracts

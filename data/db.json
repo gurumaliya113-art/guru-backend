@@ -95,6 +95,7 @@
       "isOnboarded": false
     }
   },
+  "accounts": {},
   "attempts": {},
   "papers": {
     "u_v9ox4h70mp0ujjqz": [
@@ -1220,5 +1221,25 @@
       ],
       "source": "seed"
     }
-  ]
+  ],
+  "documents": [],
+  "pdfPages": [],
+  "classes": [],
+  "memberships": [],
+  "assignments": [],
+  "topics": [],
+  "flashcards": [
+    {
+      "id": "fc_1dc786b7f2bd",
+      "subject": "Biology",
+      "topic": "Cell Structure",
+      "classLevel": "10",
+      "examType": "NEET",
+      "question": "azad ke kitne paise",
+      "answer": "40 paise",
+      "difficulty": "Moderate",
+      "createdAt": "2026-06-10T04:47:04.564Z"
+    }
+  ],
+  "pyps": []
 }

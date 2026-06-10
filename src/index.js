@@ -112,6 +112,15 @@ app.get("/api/questions", async (_req, res) => {
   }
 });
 
+app.get("/api/flashcards", async (_req, res) => {
+  try {
+    const flashcards = (await storage.getFlashcards?.()) || [];
+    res.json({ flashcards });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 // Public: serve PDF page snapshots (diagrams) for figure-questions.
 // No auth — these are needed by both admin review and student app.
 app.get("/api/documents/:id/pages/:n.png", async (req, res) => {
