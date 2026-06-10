@@ -20,7 +20,8 @@ Extract every question from the provided text. For each question return:
 - type: "MCQ" | "Assertion-Reason" | "Case-Based". Default "MCQ".
 - examType: array containing one or more of "NEET", "JEE", "BOARD". Default ["NEET"].
 - year: integer year if mentioned (e.g. PYQ 2022), else null.
-
+- Do not paraphrase, simplify, or rewrite notation. Preserve what is written in the source as closely as possible.
+- Preserve exact math notation. If you encounter corrupted fraction notation like '_{36}^x^2', 'x^2_36' or 'y^2_{16}' in the source, normalize it into correct LaTeX-style fraction form such as '\\frac{x^2}{36}' or '\\frac{y^2}{16}'.
 Return ONLY valid JSON of the shape: { "questions": [...] }
 No prose, no markdown fences.`;
 

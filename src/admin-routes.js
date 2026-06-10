@@ -8,9 +8,10 @@ import { parseWithGemini, isGeminiAvailable } from "./parsers/gemini.js";
 import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
 import { extractPdfPages } from "./parsers/pdf-extract.js";
 import { extractRawPdfPages } from "./parsers/pdf-raw.js";
+import { extractDocxPages } from "./parsers/docx-extract.js";
 import { renderPagesToPng } from "./parsers/pdf-render.js";
 import {
-  savePdfBytes,
+  saveDocumentBytes,
   getPdfBytes,
   savePageImage,
   newDocumentId,
@@ -20,13 +21,29 @@ const upload = multer({
   storage: multer.memoryStorage(), // we never persist the PDF — only its extracted text
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf" || file.originalname.toLowerCase().endsWith(".pdf")) {
+    const lower = file.originalname.toLowerCase();
+    if (
+      file.mimetype === "application/pdf" ||
+      lower.endsWith(".pdf") ||
+      file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      lower.endsWith(".docx") ||
+      file.mimetype === "application/msword" ||
+      lower.endsWith(".doc")
+    ) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF files are supported"));
+      cb(new Error("Only PDF and Word documents (.doc, .docx) are supported"));
     }
   },
 });
+
+function getFileType(filename) {
+  const lower = (filename || "").toLowerCase();
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".docx")) return "docx";
+  if (lower.endsWith(".doc")) return "doc";
+  return "unknown";
+}
 
 export function buildAdminRouter(storage) {
   const r = Router();
@@ -277,19 +294,20 @@ export function buildAdminRouter(storage) {
     };
 
     try {
-      // ---- 1. Extract text from PDF per-page ----
-      // Raw mode uses pdf-parse instead of the default PDF.js extractor.
-      console.log(`[parse-pdf] Starting extraction with mode: ${requestedMode}`);
-      const extracted = requestedMode === "raw"
-        ? await extractRawPdfPages(req.file.buffer)
-        : await extractPdfPages(req.file.buffer);
+      // ---- 1. Extract text from the uploaded document per-page ----
+      const fileType = getFileType(req.file.originalname);
+      console.log(`[parse-pdf] Starting extraction for ${fileType} with mode: ${requestedMode}`);
+      const extracted = fileType === "pdf"
+        ? requestedMode === "raw"
+          ? await extractRawPdfPages(req.file.buffer)
+          : await extractPdfPages(req.file.buffer)
+        : await extractDocxPages(req.file.buffer);
       console.log(`[parse-pdf] Extraction complete: ${extracted.pageCount} pages, ${extracted.textLength} chars`);
       const text = extracted.fullText.trim();
       const pageCount = extracted.pageCount;
       const pagesHaveImages = extracted.pages.some((p) => p.hasImage);
-      // a PDF is "scanned" when nearly no text was extracted at all
       const totalChars = extracted.pages.reduce((s, p) => s + (p.text?.length || 0), 0);
-      const isScanned = totalChars < 100;
+      const isScanned = fileType === "pdf" && totalChars < 100;
 
       if (isScanned) {
         return res.status(422).json({
@@ -351,7 +369,7 @@ export function buildAdminRouter(storage) {
       const documentId = newDocumentId();
       let storageInfo;
       try {
-        storageInfo = await savePdfBytes({
+        storageInfo = await saveDocumentBytes({
           id: documentId,
           filename: req.file.originalname,
           buffer: req.file.buffer,

@@ -30,16 +30,28 @@ export function newDocumentId() {
   return "doc_" + crypto.randomBytes(6).toString("hex");
 }
 
-export async function savePdfBytes({ id, filename, buffer }) {
+export async function saveDocumentBytes({ id, filename, buffer }) {
   const useSupabase = process.env.STORAGE === "supabase";
   const safeName = (filename || "file.pdf").replace(/[^\w.\-]+/g, "_");
   const objectKey = `${id}/${safeName}`;
+  const ext = path.extname(safeName).toLowerCase() || ".pdf";
+  const contentType =
+    ext === ".docx"
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : ext === ".doc"
+      ? "application/msword"
+      : ext === ".pdf"
+      ? "application/pdf"
+      : "application/octet-stream";
 
   if (useSupabase) {
+    if (!supabase) {
+      throw new Error("Supabase storage is configured (STORAGE=supabase) but SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/ANON_KEY are not set.");
+    }
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(objectKey, buffer, {
-        contentType: "application/pdf",
+        contentType,
         upsert: false,
       });
     if (error) {
@@ -55,9 +67,9 @@ export async function savePdfBytes({ id, filename, buffer }) {
   }
 
   ensureLocalDir();
-  const fullPath = path.join(LOCAL_DIR, `${id}.pdf`);
-  fs.writeFileSync(fullPath, buffer);
-  return { backend: "local", path: fullPath, sizeBytes: buffer.length };
+  const localPath = path.join(LOCAL_DIR, `${id}${ext}`);
+  fs.writeFileSync(localPath, buffer);
+  return { backend: "local", path: localPath, sizeBytes: buffer.length };
 }
 
 export async function getPdfBytes(storagePath, backend) {
@@ -83,6 +95,9 @@ export async function savePageImage({ docId, pageNumber, buffer }) {
   const useSupabase = process.env.STORAGE === "supabase";
   const filename = `page-${pageNumber}.png`;
   if (useSupabase) {
+    if (!supabase) {
+      throw new Error("Supabase storage is configured (STORAGE=supabase) but SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/ANON_KEY are not set.");
+    }
     const objectKey = `${docId}/pages/${filename}`;
     const { error } = await supabase.storage
       .from(BUCKET)
@@ -104,6 +119,9 @@ export async function savePageImage({ docId, pageNumber, buffer }) {
 /** Fetch a stored page image. Mirrors getPdfBytes. */
 export async function getPageImageBytes({ docId, pageNumber, backend }) {
   if (backend === "supabase") {
+    if (!supabase) {
+      throw new Error("Supabase storage is configured (STORAGE=supabase) but SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/ANON_KEY are not set.");
+    }
     const key = `${docId}/pages/page-${pageNumber}.png`;
     const { data, error } = await supabase.storage.from(BUCKET).download(key);
     if (error) throw error;

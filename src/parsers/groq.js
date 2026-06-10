@@ -22,6 +22,8 @@ CRITICAL — PRESERVE EVERY SYMBOL EXACTLY:
 - Convert Unicode subscripts/superscripts to LaTeX-style underscores when natural:
    "L₁" -> "L_1",  "x²" -> "x^2",  "H₂O" -> "H_2O",  "λ" -> "λ"  (keep Greek letters as-is).
 - Keep math expressions, equations, units (m/s, μC, Ω) and Greek letters intact.
+- Do not paraphrase, simplify, or rewrite notation. Preserve what is written in the source as closely as possible.
+- When a denominator is written with a misplaced underscore or superscript, preserve the correct mathematical intent using LaTeX fraction form. For example, interpret '_{36}^x^2' or 'x^2_36' as '\\frac{x^2}{36}'.
 - Keep references like "as shown in figure", "in the diagram above" intact in the question text.
 
 The user's text contains markers "===== PAGE N =====" indicating page boundaries.

@@ -788,21 +788,43 @@ app.get("/api/pyp/:id", requireAuth, async (req, res) => {
 // We pull the actual key / amount from env so the values stay out of git.
 const RZP_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
 const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
-const RZP_AMOUNT = parseInt(process.env.RAZORPAY_PLAN_AMOUNT_PAISE || "4900", 10);
 const RZP_CURRENCY = process.env.RAZORPAY_PLAN_CURRENCY || "INR";
-const RZP_VALIDITY_DAYS = parseInt(process.env.RAZORPAY_PLAN_VALIDITY_DAYS || "365", 10);
+const RZP_DEFAULT_AMOUNT = parseInt(process.env.RAZORPAY_PLAN_AMOUNT_PAISE || "4900", 10);
+const RZP_DEFAULT_VALIDITY_DAYS = parseInt(process.env.RAZORPAY_PLAN_VALIDITY_DAYS || "365", 10);
+
+const RZP_PLANS = {
+  "7d-29": { amount: 2900, validityDays: 7, label: "7 days", description: "7-day access" },
+  "30d-99": { amount: 9900, validityDays: 30, label: "30 days", description: "30-day access" },
+  "3m-249": { amount: 24900, validityDays: 90, label: "3 months", description: "3-month access" },
+  "lifetime-999": { amount: 99900, validityDays: null, label: "Lifetime", description: "Unlimited access" },
+  "yearly-49": { amount: RZP_DEFAULT_AMOUNT, validityDays: RZP_DEFAULT_VALIDITY_DAYS, label: "1 year", description: "Yearly subscription" },
+};
+
+const RZP_DEFAULT_PLAN = "30d-99";
 
 function razorpayConfigured() {
   return !!(RZP_KEY_ID && RZP_KEY_SECRET);
+}
+
+function getPlan(planId = RZP_DEFAULT_PLAN) {
+  return RZP_PLANS[planId] || RZP_PLANS[RZP_DEFAULT_PLAN];
 }
 
 app.get("/api/payments/config", (_req, res) => {
   res.json({
     configured: razorpayConfigured(),
     keyId: RZP_KEY_ID || null,
-    amount: RZP_AMOUNT,
+    amount: getPlan().amount,
     currency: RZP_CURRENCY,
-    plan: "yearly-49",
+    plan: RZP_DEFAULT_PLAN,
+    plans: Object.entries(RZP_PLANS).map(([id, plan]) => ({
+      id,
+      amount: plan.amount,
+      currency: RZP_CURRENCY,
+      label: plan.label,
+      description: plan.description,
+      validityDays: plan.validityDays,
+    })),
   });
 });
 
@@ -814,6 +836,8 @@ app.post("/api/payments/create-order", requireAuth, async (req, res) => {
   }
 
   try {
+    const planId = String(req.body?.plan || RZP_DEFAULT_PLAN);
+    const plan = getPlan(planId);
     const auth = "Basic " + Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString("base64");
     // Razorpay receipt must be <= 40 chars. user.id may be long; truncate.
     const receipt = `s_${String(user.id).slice(0, 20)}_${Date.now().toString(36)}`;
@@ -821,10 +845,10 @@ app.post("/api/payments/create-order", requireAuth, async (req, res) => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: auth },
       body: JSON.stringify({
-        amount: RZP_AMOUNT,
+        amount: plan.amount,
         currency: RZP_CURRENCY,
         receipt,
-        notes: { userId: String(user.id), plan: "yearly-49" },
+        notes: { userId: String(user.id), plan: planId },
       }),
     });
     const data = await r.json();
@@ -850,7 +874,7 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     return res.status(503).json({ error: "Razorpay is not configured on the server." });
   }
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan: requestedPlan } = req.body || {};
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ error: "Missing payment fields" });
   }
@@ -864,15 +888,35 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "Signature mismatch — payment not verified" });
   }
 
-  // Persist the subscription on the user's profile.
+  let planId = String(requestedPlan || "");
+  if (!planId) {
+    try {
+      const auth = "Basic " + Buffer.from(`${RZP_KEY_ID}:${RZP_KEY_SECRET}`).toString("base64");
+      const orderRes = await fetch(
+        `https://api.razorpay.com/v1/orders/${encodeURIComponent(razorpay_order_id)}`,
+        { headers: { Authorization: auth } },
+      );
+      const orderData = await orderRes.json();
+      if (orderRes.ok && orderData?.notes?.plan) {
+        planId = String(orderData.notes.plan);
+      }
+    } catch (err) {
+      console.warn("[razorpay] failed to fetch order details for plan note", err);
+    }
+  }
+
+  const plan = getPlan(planId || RZP_DEFAULT_PLAN);
+  const validUntil = plan.validityDays == null
+    ? undefined
+    : new Date(Date.now() + plan.validityDays * 86400 * 1000).toISOString();
+
   try {
     const profile = (await storage.getProfile(user.id.toString())) || {};
-    const validUntil = new Date(Date.now() + RZP_VALIDITY_DAYS * 86400 * 1000).toISOString();
     const updated = {
       ...profile,
       subscription: {
         active: true,
-        plan: "yearly-49",
+        plan: planId || RZP_DEFAULT_PLAN,
         validUntil,
         razorpayPaymentId: razorpay_payment_id,
       },
