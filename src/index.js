@@ -7,6 +7,7 @@ import session from "express-session";
 import crypto from "crypto";
 import multer from "multer";
 import path from "path";
+import Groq from "groq-sdk";
 import authRoutes from "./routes/auth.js";
 import { jsonStorage } from "./storage/json.js";
 import { supabaseStorage } from "./storage/supabase.js";
@@ -924,6 +925,71 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     await storage.saveProfile(user.id.toString(), updated);
     res.json({ ok: true, subscription: updated.subscription });
   } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// --- AI Chat (Groq-powered Q&A) ---
+const groqClient = process.env.GROQ_API_KEY_CHAT
+  ? new Groq({
+      apiKey: process.env.GROQ_API_KEY_CHAT,
+    })
+  : null;
+
+app.post("/api/ai/chat", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+
+  if (!groqClient) {
+    return res.status(503).json({ error: "AI service is not configured. Please set GROQ_API_KEY_CHAT in environment." });
+  }
+
+  try {
+    const { message, conversationHistory } = req.body;
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const systemPrompt = `You are a helpful AI study assistant for students preparing for competitive exams like NEET and JEE. 
+Your role is to:
+- Explain complex concepts clearly and concisely
+- Answer questions about NEET, JEE, Board, CBSE, and HBSE exam topics
+- Help with physics, chemistry, biology, and mathematics
+- Provide study tips and exam strategies
+- Be encouraging and supportive
+
+Keep responses concise (1-2 paragraphs) unless asked for more detail.`;
+
+    const messages = [
+      ...(conversationHistory || []).map((msg) => ({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.content,
+      })),
+      {
+        role: "user",
+        content: message,
+      },
+    ];
+
+    const response = await groqClient.chat.completions.create({
+      model: process.env.GROQ_MODEL_CHAT || "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        ...messages,
+      ],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const assistantMessage = response.choices[0]?.message?.content || "Sorry, I couldn't generate a response.";
+
+    res.json({ response: assistantMessage });
+  } catch (e) {
+    console.error("[ai/chat] Groq API error:", e);
     res.status(500).json({ error: String(e.message || e) });
   }
 });
