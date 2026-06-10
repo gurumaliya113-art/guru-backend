@@ -22,10 +22,19 @@ const storage = process.env.STORAGE === "supabase" ? supabaseStorage : jsonStora
 const app = express();
 // CORS: allow comma-separated origins via FRONTEND_URL or CLIENT_ORIGIN.
 // Example: FRONTEND_URL="https://frontend-two.vercel.app,http://localhost:5173"
-const allowedOrigins = (process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || "http://localhost:5173")
+const defaultLocalOrigins = [
+  "http://localhost:5173",
+  "http://localhost:4173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:4173",
+  "http://127.0.0.1:3000",
+];
+const allowedOrigins = (process.env.FRONTEND_URL || process.env.CLIENT_ORIGIN || defaultLocalOrigins.join(","))
   .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+  .map((s) => s.trim().replace(/\/$/, ""))
+  .filter(Boolean)
+  .concat(defaultLocalOrigins);
 app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin / curl (no origin header) and any explicitly whitelisted origin.
@@ -930,9 +939,10 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
 });
 
 // --- AI Chat (Groq-powered Q&A) ---
-const groqClient = process.env.GROQ_API_KEY_CHAT
+const groqApiKey = process.env.GROQ_API_KEY_CHAT || process.env.GROQ_API_KEY;
+const groqClient = groqApiKey
   ? new Groq({
-      apiKey: process.env.GROQ_API_KEY_CHAT,
+      apiKey: groqApiKey,
     })
   : null;
 
@@ -941,7 +951,7 @@ app.post("/api/ai/chat", requireAuth, async (req, res) => {
   if (!user) return;
 
   if (!groqClient) {
-    return res.status(503).json({ error: "AI service is not configured. Please set GROQ_API_KEY_CHAT in environment." });
+    return res.status(503).json({ error: "AI service is not configured. Please set GROQ_API_KEY_CHAT or GROQ_API_KEY in environment." });
   }
 
   try {
