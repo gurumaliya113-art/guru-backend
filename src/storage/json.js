@@ -15,6 +15,8 @@ const DEFAULT_DB = {
   questions: [],    // Question[] — global, managed by admin
   documents: [],    // Document[] — uploaded PDF metadata
   pdfPages: [],     // Raw PDF pages extracted when using the new raw parser
+  notes: [],        // Note[] — { id, classId, subjectId, chapterId, title, content, attachments, meta, createdAt }
+  tests: [],        // Test[] — { id, title, classId, targetTags, durationMinutes, questionIds, published, authorId }
   classes: [],      // ClassRoom[]
   memberships: [],  // Membership[]
   assignments: [],  // Assignment[]  — paper assigned to class
@@ -383,5 +385,65 @@ export const jsonStorage = {
     const db = read();
     db.pyps = (db.pyps || []).filter((p) => p.id !== id);
     write(db);
+  },
+  // ----- Notes -----
+  async getNotes(query = {}) {
+    const db = read();
+    let list = db.notes || [];
+    if (query.classId) list = list.filter((n) => String(n.classId) === String(query.classId));
+    if (query.subjectId) list = list.filter((n) => String(n.subjectId) === String(query.subjectId));
+    if (query.chapterId) list = list.filter((n) => String(n.chapterId) === String(query.chapterId));
+    if (query.q) {
+      const q = String(query.q || "").toLowerCase();
+      list = list.filter((n) => (n.title || "").toLowerCase().includes(q) || (n.content || "").toLowerCase().includes(q));
+    }
+    return list;
+  },
+  async getNote(id) {
+    const db = read();
+    return (db.notes || []).find((n) => n.id === id) || null;
+  },
+  async addNote(note) {
+    const db = read();
+    const row = { ...(note || {}), createdAt: new Date().toISOString() };
+    db.notes = [row, ...(db.notes || [])];
+    write(db);
+    return row;
+  },
+  async updateNote(id, updates) {
+    const db = read();
+    const idx = (db.notes || []).findIndex((n) => n.id === id);
+    if (idx >= 0) {
+      db.notes[idx] = { ...db.notes[idx], ...updates };
+      write(db);
+      return db.notes[idx];
+    }
+    return null;
+  },
+  async deleteNote(id) {
+    const db = read();
+    db.notes = (db.notes || []).filter((n) => n.id !== id);
+    write(db);
+    return true;
+  },
+
+  // ----- Tests -----
+  async getTests(query = {}) {
+    const db = read();
+    let list = db.tests || [];
+    if (query.classId) list = list.filter((t) => String(t.classId) === String(query.classId));
+    if (query.published !== undefined) list = list.filter((t) => Boolean(t.published) === Boolean(query.published));
+    return list;
+  },
+  async getTest(id) {
+    const db = read();
+    return (db.tests || []).find((t) => t.id === id) || null;
+  },
+  async addTest(test) {
+    const db = read();
+    const row = { ...(test || {}), createdAt: new Date().toISOString() };
+    db.tests = [row, ...(db.tests || [])];
+    write(db);
+    return row;
   },
 };

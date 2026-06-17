@@ -187,8 +187,9 @@ export async function extractPdfPages(buffer) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
 
-    // Detect images on this page (heuristic: any operator that's an image paint)
+    // Detect images on this page and extract their bounding boxes
     let hasImage = false;
+    let imageBounds = [];
     try {
       const ops = await page.getOperatorList();
       const fnSet = new Set([
@@ -196,8 +197,26 @@ export async function extractPdfPages(buffer) {
         pdf.OPS?.paintInlineImageXObject,
         pdf.OPS?.paintImageMaskXObject,
       ]);
-      for (const fn of ops.fnArray) {
-        if (fnSet.has(fn)) { hasImage = true; break; }
+      
+      // Scan operator list for image paint operations
+      for (let j = 0; j < ops.fnArray.length; j++) {
+        const fn = ops.fnArray[j];
+        if (fnSet.has(fn)) {
+          hasImage = true;
+          // Try to extract CTM (current transformation matrix) which gives position/size
+          // For paintImageXObject/paintInlineImageXObject, args typically contain transform matrix
+          const args = ops.argsArray[j];
+          if (Array.isArray(args) && args.length > 0) {
+            // args[0] is often the image object; look for transform matrix in vicinity
+            // Store raw args for later processing by render logic
+            imageBounds.push({
+              fnIndex: j,
+              fn,
+              args,
+              hasRawBounds: true,
+            });
+          }
+        }
       }
     } catch {
       // operator list not critical — skip
@@ -206,7 +225,12 @@ export async function extractPdfPages(buffer) {
     const tc = await page.getTextContent({ includeMarkedContent: false });
     const text = repairMathNotation(normaliseChars(itemsToText(tc.items)));
 
-    pages.push({ pageNumber: i, text, hasImage });
+    pages.push({ 
+      pageNumber: i, 
+      text, 
+      hasImage,
+      imageBounds: imageBounds.length > 0 ? imageBounds : null,
+    });
     page.cleanup?.();
   }
 

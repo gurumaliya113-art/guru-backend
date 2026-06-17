@@ -38,7 +38,9 @@ export function isValidAdminToken(token) {
 export function requireAdmin(req, res, next) {
   // Accept token from header (default) OR query string (for iframes / <embed> / direct browser GETs)
   const token = req.header("x-admin-token") || req.query?.token;
-  if (!isValidAdminToken(token)) {
+  // Allow either a valid admin token OR a logged-in session user with role 'admin'
+  const sessionIsAdmin = req.session?.user?.role === "admin";
+  if (!isValidAdminToken(token) && !sessionIsAdmin) {
     return res.status(401).json({ error: "Admin authentication required" });
   }
   next();

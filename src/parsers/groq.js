@@ -156,8 +156,15 @@ export async function parseWithGroq(rawText) {
     }
 
     let parsed;
-    try { parsed = JSON.parse(raw); } catch {
-      console.warn(`[Groq Parser] chunk ${i + 1} returned non-JSON, skipping`);
+    try {
+      parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch (err) {
+      console.warn(
+        `[Groq Parser] chunk ${i + 1} returned non-JSON, skipping. raw=${
+          typeof raw === "string" ? raw.slice(0, 1000) : JSON.stringify(raw)
+        }`,
+        err,
+      );
       continue;
     }
     const list = Array.isArray(parsed?.questions) ? parsed.questions : [];
@@ -179,7 +186,7 @@ export async function parseWithGroq(rawText) {
   return deduped;
 }
 
-function normalise(q) {
+function normalise(q, pageImageBounds = null) {
   const allowedSubjects = ["Physics", "Chemistry", "Biology", "Mathematics"];
   const allowedDifficulty = ["Easy", "Moderate", "Hard"];
   const allowedType = ["MCQ", "Assertion-Reason", "Numerical", "Case-Based"];
@@ -214,6 +221,8 @@ function normalise(q) {
     year: Number.isInteger(q.year) ? q.year : undefined,
     pageNumber: Number.isInteger(q.pageNumber) && q.pageNumber > 0 ? q.pageNumber : null,
     hasFigure: typeof q.hasFigure === "boolean" ? q.hasFigure : detectedFigure,
+    // Attach extracted image bounds (if available) for precise cropping later
+    figureBounds: (detectedFigure || q.hasFigure) && pageImageBounds ? pageImageBounds : null,
     source: "pdf-groq",
   };
 }

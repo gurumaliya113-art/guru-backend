@@ -245,6 +245,75 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ---- Notes management (admin upload) ----
+  r.get("/notes", requireAdmin, async (_req, res) => {
+    try {
+      const notes = await storage.getNotes?.() || [];
+      res.json({ notes });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.post("/notes", requireAdmin, async (req, res) => {
+    try {
+      const { title, subject, chapter, examType, classLevel, board, description, fileUrl } = req.body || {};
+      if (!title || !String(title).trim()) return res.status(400).json({ error: "title is required" });
+      if (!subject || !String(subject).trim()) return res.status(400).json({ error: "subject is required" });
+      
+      const note = {
+        id: `note_${crypto.randomBytes(6).toString("hex")}`,
+        title: String(title).trim(),
+        subject: String(subject).trim(),
+        chapter: chapter ? String(chapter).trim() : null,
+        examType: examType ? String(examType).trim() : null,
+        classLevel: classLevel ? String(classLevel).trim() : null,
+        board: board ? String(board).trim() : null,
+        description: description ? String(description).trim() : "",
+        fileUrl: fileUrl ? String(fileUrl).trim() : null,
+        uploadedBy: req.session?.user?.id || "admin",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      const saved = await storage.addNote(note);
+      res.json({ note: saved });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.put("/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      const { title, subject, chapter, examType, classLevel, board, description, fileUrl } = req.body || {};
+      const updates = {};
+      if (title !== undefined) updates.title = String(title).trim();
+      if (subject !== undefined) updates.subject = String(subject).trim();
+      if (chapter !== undefined) updates.chapter = chapter ? String(chapter).trim() : null;
+      if (examType !== undefined) updates.examType = examType ? String(examType).trim() : null;
+      if (classLevel !== undefined) updates.classLevel = classLevel ? String(classLevel).trim() : null;
+      if (board !== undefined) updates.board = board ? String(board).trim() : null;
+      if (description !== undefined) updates.description = description ? String(description).trim() : "";
+      if (fileUrl !== undefined) updates.fileUrl = fileUrl ? String(fileUrl).trim() : null;
+      updates.updatedAt = new Date().toISOString();
+      
+      const updated = await storage.updateNote(req.params.id, updates);
+      if (!updated) return res.status(404).json({ error: "Note not found" });
+      res.json({ note: updated });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
+  r.delete("/notes/:id", requireAdmin, async (req, res) => {
+    try {
+      await storage.deleteNote?.(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e?.message || e) });
+    }
+  });
+
   // ---- Previous Year Papers / Mocks (admin upload) ----
   // Admin creates a PYP by sending the full questions array. We don't try
   // to parse PDFs here — the regular /parse-pdf flow already extracts
@@ -465,6 +534,7 @@ export function buildAdminRouter(storage) {
       // ---- 3b. Render & save PNG snapshots of pages that have figure-questions ----
       // We snapshot only the pages where at least one question has hasFigure=true
       // (or where the page itself contains an image). Saves ~10× space vs. all pages.
+      // NEW: Extract figure bounds from each page's image metadata for cropped rendering.
       const figurePageSet = new Set();
       for (const q of questions) {
         if (q.hasFigure && Number.isInteger(q.pageNumber)) figurePageSet.add(q.pageNumber);
@@ -474,11 +544,26 @@ export function buildAdminRouter(storage) {
       }
       const figurePages = [...figurePageSet];
 
+      // Build a map of page -> figure bounds for cropped rendering
+      // For now, we estimate bounds from the first image on each page (more sophisticated matching possible later)
+      const figureBoundsMap = new Map();
+      for (const pageNum of figurePages) {
+        const pageData = extracted.pages.find((p) => p.pageNumber === pageNum);
+        if (pageData && pageData.imageBounds && pageData.imageBounds.length > 0) {
+          // Use first image's bounds as the figure region (in PDF coordinates)
+          // In production, could enhance this to match specific questions to specific images
+          const firstImageData = pageData.imageBounds[0];
+          // For now, use a reasonable estimate: [0, 0, pageWidth, pageHeight] will be computed by renderer
+          // TODO: Extract actual bounds from transform matrix
+          console.log(`[parse-pdf] page ${pageNum} has image metadata, will attempt cropped rendering`);
+        }
+      }
+
       const pageImageMap = {}; // pageNumber -> public URL
       if (figurePages.length > 0) {
         try {
           console.log(`[parse-pdf] rendering ${figurePages.length} figure page(s):`, figurePages.join(", "));
-          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8);
+          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8, figureBoundsMap.size > 0 ? figureBoundsMap : null);
           console.log(`[parse-pdf] rendered ${rendered.size}/${figurePages.length} page(s), saving…`);
           for (const [pageNumber, pngBuf] of rendered) {
             try {

@@ -49,7 +49,7 @@
     },
     "u_v9ox4h70mp0ujjqz": {
       "name": "bhyn",
-      "role": "student",
+      "role": "admin",
       "targetExam": "NEET",
       "streak": 0,
       "lastQuizDate": "",
@@ -93,10 +93,145 @@
       ],
       "rank": 142,
       "isOnboarded": false
+    },
+    "u_4983b4d77671": {
+      "name": "azad",
+      "email": "azadgupta1010@gmail.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [
+        {
+          "id": "topper",
+          "name": "Topper",
+          "description": "Score 90%+ in a quiz",
+          "icon": "award",
+          "earned": false
+        },
+        {
+          "id": "fast-solver",
+          "name": "Fast Solver",
+          "description": "Complete under 10 min",
+          "icon": "zap",
+          "earned": false
+        },
+        {
+          "id": "accuracy-king",
+          "name": "Accuracy King",
+          "description": "85%+ accuracy over 5 quizzes",
+          "icon": "target",
+          "earned": false
+        },
+        {
+          "id": "streak-5",
+          "name": "5-Day Streak",
+          "description": "Study 5 days in a row",
+          "icon": "activity",
+          "earned": false
+        },
+        {
+          "id": "first-paper",
+          "name": "Paper Maker",
+          "description": "Generate your first paper",
+          "icon": "file-text",
+          "earned": false
+        }
+      ],
+      "rank": 142,
+      "isOnboarded": true,
+      "passwordHash": "scrypt$a1ab9d6f2f1aab0b4899c17b4e2ba2f8$3e492842154b388765187cec8302a5c6282271c56d417a5487d3aa1ce27e671856d51eb66d5055e474e011b8b3f65f243a8b322dddbd0d253155c64900c613bb",
+      "username": "azad",
+      "phone": "8053317489",
+      "schoolName": "bps",
+      "classLevel": "12",
+      "skipClassJoin": true
+    },
+    "u_6da381ad24e7": {
+      "name": "testuser",
+      "email": "testuser@example.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [],
+      "rank": 0,
+      "isOnboarded": false,
+      "passwordHash": "scrypt$96bd840916cf70fc0e79fe4ef4c57eda$769b131cb63ea8ca10444d050d9f41e05527ebc375cfa18dee6ad26e0c88a4f83f43d422f0a0461909fe87a2cba191e861d794b1d7bc918088e4dd9a0d10243d"
+    },
+    "u_c4de1d606309": {
+      "name": "testuser2",
+      "email": "testuser2@example.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [],
+      "rank": 0,
+      "isOnboarded": false,
+      "passwordHash": "scrypt$21c02ec242e2466a818e1f5dda2597b3$01941e3440c29e02bf841c3582f97184fcac8420f2b72daacf0c16fd0652b38f32a33148a06da80d1bc2bbbcc2c23d04c60ecea83ca77a2f7a18f23848962b49"
+    },
+    "u_31944afe29a0": {
+      "name": "azadgupta",
+      "email": "azadgupta@gmail.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [],
+      "rank": 0,
+      "isOnboarded": false,
+      "passwordHash": "scrypt$6b5f480ac9c534d5dcbe20ad1bc31d4c$a4cb0d23bdf774e2e1c1b9a6566cbb602beea1b1ad524145b8578e1b2d07df1cf2362f30b501d1a93f05542a54ba516d74df587d4e4dbdd089b63ac4032286df"
+    },
+    "u_365223f79249": {
+      "name": "komaljha123",
+      "email": "komaljha123@gmail.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [],
+      "rank": 0,
+      "isOnboarded": false,
+      "passwordHash": "scrypt$5613fac7c54164143561047dad34a108$edcb11bfd85e3f285deb67df562ca82d019554f67545b6114ab0edfe6f4f2eaa55d2b3b2d8c49f82977f3681d9a11ae9eb6869671180aa96e2b75fd58dbe7ee6"
+    },
+    "u_b78791f8c4f3": {
+      "name": "kbdon7718",
+      "email": "kbdon7718@gmail.com",
+      "picture": null,
+      "role": "student",
+      "targetExam": "NEET",
+      "streak": 0,
+      "lastQuizDate": "",
+      "totalPoints": 0,
+      "badges": [],
+      "rank": 0,
+      "isOnboarded": false,
+      "passwordHash": "scrypt$1a8d5612de76eb2d57e7b0d73aa7a637$f31bb4781ee5f3a7583098ad61f512ef56b07313689924da0d8ad4401b7ccc0ce115eff819b601a910afcc0987081d71ab3dc2f93421b323c131197223f7eafb"
     }
   },
   "accounts": {},
-  "attempts": {},
+  "attempts": {
+    "u_v9ox4h70mp0ujjqz": [
+      {
+        "id": "att_1",
+        "testId": "test_sample_1",
+        "score": 78,
+        "startedAt": "2026-06-14T05:10:00.000Z",
+        "endedAt": "2026-06-14T05:25:00.000Z"
+      }
+    ]
+  },
   "papers": {
     "u_v9ox4h70mp0ujjqz": [
       {
@@ -773,27 +908,333 @@
   },
   "questions": [
     {
-      "id": "q_16ebcb56",
+      "id": "q_0bacf25a",
       "subject": "Physics",
-      "topic": "Thermodynamics",
-      "text": "azad ke 4 bche ghainb  jmnbb ",
+      "topic": "Distance and Displacement",
+      "text": "A sportsman runs around a circular track of radius 𝑟 such that he traverses the path 𝐴𝐵𝐴𝐵. The distance travelled and displacement, respectively, are",
       "options": [
-        "errr",
-        "bbbbbbb",
-        "ftfvbhj",
-        "ddddddd"
+        "2r, 3𝜋r",
+        "3𝜋𝑟, 𝜋𝑟",
+        "𝜋𝑟, 3𝑟",
+        "3𝜋𝑟, 2𝑟"
+      ],
+      "correctIndex": 3,
+      "explanation": "Displacement = 2𝑟 Distance = 2𝜋𝑟 + 𝜋𝑟 = 3𝜋𝑟",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "classLevel": "10",
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 1,
+      "hasFigure": false,
+      "pageImageUrl": "/api/documents/doc_d797969b74bb/pages/1.png",
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_289a3f9a",
+      "subject": "Physics",
+      "topic": "Rotational Motion",
+      "text": "A disc is rolling without slipping on a surface. The radius of the disc is 𝑅. At 𝑡 = 0, the top most point on the disc is 𝐴 as shown in figure. When the disc completes half of its rotation, the displacement of point 𝐴 from its initial position is",
+      "options": [
+        "𝑅√ (𝜋^2^ + 4)",
+        "𝑅√ (𝜋^2^ + 1)",
+        "2𝑅",
+        "2𝑅√ (1 + 4𝜋^2)"
       ],
       "correctIndex": 0,
-      "explanation": "",
+      "explanation": "Displacement = √ (2𝑅)^2^ + (𝜋𝑅)^2^ = 𝑅 √ (4 + 𝜋^2)",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 1,
+      "hasFigure": true,
+      "pageImageUrl": "/api/documents/doc_d797969b74bb/pages/1.png",
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_0f39390d",
+      "subject": "Physics",
+      "topic": "Distance and Displacement",
+      "text": "A cyclist starts from the point 𝑃 of a circular ground of radius 2 km and travels along its circumference to the point S. The displacement of a cyclist is _______.",
+      "options": [
+        "6 km",
+        "√ 8 km",
+        "4 km",
+        "8 km"
+      ],
+      "correctIndex": 1,
+      "explanation": "∴ Displacement = R√ 2 = 2√ 2 = √ 8 km",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 1,
+      "hasFigure": false,
+      "pageImageUrl": "/api/documents/doc_d797969b74bb/pages/1.png",
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_d143c064",
+      "subject": "Physics",
+      "topic": "Motion with Constant Acceleration",
+      "text": "A body starts moving from rest with constant acceleration covers displacement 𝑆1 in first (𝑝 − 1)seconds and 𝑆2 in first 𝑝 seconds. The displacement 𝑆1 + 𝑆2 will be made in time :",
+      "options": [
+        "(2p + 1)s",
+        "√ (2p^2^ − 2p + 1) s",
+        "(2p − 1)s",
+        "(2𝑝^2^ − 2𝑝 + 1) 𝑠"
+      ],
+      "correctIndex": 1,
+      "explanation": "𝑆1 = ^1_2_ a(p − 1)^2 𝑆2 = ^1_2_ a(p)^2 𝑆1 + 𝑆2 = ^1_2_ at^2 (p − 1)^2^ + p^2^ = t^2 t = √ 2p^2^ + 1 − 2p",
       "difficulty": "Hard",
       "type": "MCQ",
       "examType": [
-        "NEET",
         "JEE"
       ],
-      "year": 2025,
-      "source": "manual",
-      "createdAt": "2026-05-11T07:53:04.730Z"
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 2,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_ffabb6af",
+      "subject": "Physics",
+      "topic": "Circular Motion",
+      "text": "A particle is moving along a circle such that it completes one revolution in 40 seconds. In 2 minutes 20 seconds, the ratio ∣ disdpilsatcaenmceent ∣ is ........",
+      "options": [
+        "0",
+        "^1_7",
+        "^2_7",
+        "^1_1"
+      ],
+      "correctIndex": 3,
+      "explanation": "𝑇 = 40 𝑠 If 𝑡 = 2 minute 20 second = 2 × 60 + 20 = 140 𝑠 So, it has completed 3 ^1_2 revolution. Distance travelled = 3 × 2𝜋𝑅 + 𝜋𝑅 = 7𝜋𝑅 Displacement = 2𝑅 ∣ D isDpilsatcaenmcee nt| = 72𝜋𝑅𝑅 = 2_2_2 = 111 7× _7",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 2,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_60891772",
+      "subject": "Physics",
+      "topic": "Circular Motion",
+      "text": "Consider the motion of the tip of the second hand of a clock. In one minute (R be the length of second hand), its ......",
+      "options": [
+        "Displacement is 2𝜋𝑅",
+        "Distance covered is 2𝑅",
+        "Displacement is zero",
+        "Distance covered is zero"
+      ],
+      "correctIndex": 2,
+      "explanation": "",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 2,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_75566d36",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "A car moves with speed 60 𝑘𝑚/ℎ for 1 hour in east direction and with same speed for 30 min in south direction. The displacement of car from initial position is ......... 𝑘𝑚",
+      "options": [
+        "A) 60",
+        "B) 30√ 3",
+        "C) 30√ 5",
+        "D) 60√ 2"
+      ],
+      "correctIndex": 2,
+      "explanation": "Displacement of car = √ 60^2^ + 30^2^ = 30√ 5 𝑘𝑚",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 3,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_fd794958",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "The numerical ratio of displacement to the distance covered is always",
+      "options": [
+        "A) Less than one",
+        "B) Equal to one",
+        "C) Equal to or less than one",
+        "D) Equal to or greater than one"
+      ],
+      "correctIndex": 2,
+      "explanation": "(c)Since displacement is always less than or equal to distance, but never greater than distance. Hence numerical ratio of displacement to the distance covered is always equal to or less than one.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 3,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_cc81e6dc",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "Which of the following is a one dimensional motion",
+      "options": [
+        "A) Landing of an aircraft",
+        "B) Earth revolving a round the sun",
+        "C) Motion of wheels of a moving trains",
+        "D) Train running on a straight track"
+      ],
+      "correctIndex": 3,
+      "explanation": "Motion of train on straight track is a one dimensional motion whereas everything else is a two dimensional or three dimensional activity.",
+      "difficulty": "Easy",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 3,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_d3c2f395",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "A body is moving from rest under constant acceleration and let 𝑆1 be the displacement in the first (𝑝 − 1) sec and 𝑆2 be the displacement in the first 𝑝 sec . The displacement in (𝑝^2^ − 𝑝 + 1)^{𝑡}^ℎ sec. will be",
+      "options": [
+        "A) 𝑆1 + 𝑆2",
+        "B) 𝑆1𝑆2",
+        "C) 𝑆1 − 𝑆2",
+        "D) 𝑆1/𝑆2"
+      ],
+      "correctIndex": 0,
+      "explanation": "(a) From 𝑆 = 𝑢𝑡 + ^1_2_ 𝑎 𝑡^2 𝑆1 = ^1_2_ 𝑎(𝑃 − 1)^2^ and 𝑆2 = ^1_2_ 𝑎 𝑃 ^2^ [𝐴𝑠 𝑢 = 0] From 𝑆𝑛 = 𝑢 + ^{𝑎}_2_ (2𝑛 − 1) 𝑆_(_{𝑃}_ 2_−_{𝑃}_ _+_1_) 𝑡ℎ = ^{𝑎}_2_ [2(𝑃 ^2^ − 𝑃 + 1) − 1] = ^{𝑎}_2_ [2𝑃 ^2^ − 2𝑃 + 1]",
+      "difficulty": "Hard",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 3,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_20d17a59",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "The displacement of a body is given to be proportional to the cube of time elapsed. The magnitude of the acceleration of the body is",
+      "options": [
+        "Increasing with time",
+        "Decreasing with time",
+        "Constant but not zero",
+        "Zero"
+      ],
+      "correctIndex": 0,
+      "explanation": "𝑆 = 𝑘𝑡^3 ∴ 𝑎 = ^{𝑑}_{𝑑}^2_{𝑡}^{𝑆} 2 = 6𝑘𝑡 i.e.𝑎 ∝ 𝑡",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 4,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_7bcb8e6b",
+      "subject": "Physics",
+      "topic": "Motion",
+      "text": "Speed of two identical cars are 𝑢 and 4𝑢at a specific instant. The ratio of the respective distances in which the two cars are stopped from that instant is",
+      "options": [
+        "1 : 1",
+        "1 : 4",
+        "1 : 8",
+        "1 : 16"
+      ],
+      "correctIndex": 3,
+      "explanation": "𝑆 ∝ 𝑢^2^ ⇒ ^{𝑆}_{𝑆}^1_2 = ( ^1_4_ ) = _1^1_6",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 4,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
+    },
+    {
+      "id": "q_10037962",
+      "subject": "Physics",
+      "topic": "Circular Motion",
+      "text": "An athlete completes one round of a circular track of radius 𝑅 in 40 𝑠𝑒𝑐. What will be his displacement at the end of 2 𝑚𝑖𝑛. 20 𝑠𝑒𝑐",
+      "options": [
+        "𝑍𝑒𝑟𝑜",
+        "2𝑅",
+        "2𝜋𝑅",
+        "7𝜋𝑅"
+      ],
+      "correctIndex": 1,
+      "explanation": "Total time of motion is 2 𝑚𝑖𝑛 20 𝑠𝑒𝑐 = 140 𝑠𝑒𝑐. As time period of circular motion is 40 𝑠𝑒𝑐 so in 140 𝑠𝑒𝑐. Athlete will complete 3.5 revolution i.e., He will be at diametrically opposite point i.e., Displacement = 2𝑅.",
+      "difficulty": "Moderate",
+      "type": "MCQ",
+      "examType": [
+        "JEE"
+      ],
+      "isNCERT": false,
+      "source": "pdf-groq",
+      "documentId": "doc_d797969b74bb",
+      "pageNumber": 4,
+      "hasFigure": false,
+      "createdAt": "2026-06-17T10:23:46.554Z"
     },
     {
       "id": "q1",
@@ -1222,8 +1663,74 @@
       "source": "seed"
     }
   ],
-  "documents": [],
+  "documents": [
+    {
+      "id": "doc_d797969b74bb",
+      "filename": "Distance n displ_solution_jee_mains_.pdf",
+      "storagePath": "D:\\gurtronapp\\guru-backend\\data\\pdfs\\doc_d797969b74bb.pdf",
+      "storageBackend": "local",
+      "sizeBytes": 573889,
+      "pageCount": 4,
+      "textLength": 5221,
+      "isScanned": false,
+      "parser": "groq",
+      "status": "ready",
+      "uploadedBy": null,
+      "subject": null,
+      "examType": null,
+      "classLevel": null,
+      "notes": null,
+      "createdAt": "2026-06-17T10:21:49.800Z"
+    }
+  ],
   "pdfPages": [],
+  "notes": [
+    {
+      "id": "note_chem_01",
+      "classId": "12",
+      "subjectId": "chemistry",
+      "chapterId": "organic-chem",
+      "title": "Markovnikov's Rule — Quick Notes",
+      "content": "Markovnikov's rule: In addition of HX to an alkene, H attaches to carbon with greater number of Hs. Example: HBr + propene → 2-bromopropane.",
+      "attachments": [],
+      "meta": {
+        "difficulty": "Easy"
+      },
+      "createdAt": "2026-06-14T05:00:00.000Z"
+    },
+    {
+      "id": "note_phy_01",
+      "classId": "11",
+      "subjectId": "physics",
+      "chapterId": "electrostatics",
+      "title": "Electrostatics — Key Formulae",
+      "content": "Potential at midpoint between +q and -q is zero. Capacitance of parallel plate C = ε0 A / d.",
+      "attachments": [],
+      "meta": {
+        "difficulty": "Easy"
+      },
+      "createdAt": "2026-06-14T05:01:00.000Z"
+    }
+  ],
+  "tests": [
+    {
+      "id": "test_sample_1",
+      "title": "Sample Practice — Electrostatics",
+      "classId": "11",
+      "targetTags": [
+        "electrostatics"
+      ],
+      "durationMinutes": 15,
+      "questionIds": [
+        "q1",
+        "q2",
+        "q4"
+      ],
+      "published": true,
+      "authorId": "u_eyij9s7vmp0ta33r",
+      "createdAt": "2026-06-14T05:05:00.000Z"
+    }
+  ],
   "classes": [],
   "memberships": [],
   "assignments": [],
