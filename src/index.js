@@ -1,12 +1,16 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, "../.env") });
 
 import express from "express";
 import cors from "cors";
 import session from "express-session";
 import crypto from "crypto";
 import multer from "multer";
-import path from "path";
 import Groq from "groq-sdk";
 import { supabase } from "./supabase.js";
 import authRoutes from "./routes/auth.js";
@@ -148,42 +152,8 @@ app.get("/api/notes/:id", async (req, res) => {
 
 app.post("/api/notes", requireAuth, async (req, res) => {
   try {
-    const saved = await storage.addNote({
-      ...req.body,
-      uploadedBy: req.session.user.id,
-      id: req.body.id || "note_" + crypto.randomBytes(4).toString("hex"),
-    });
+    const saved = await storage.addNote(req.body || {});
     res.json({ note: saved });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-app.put("/api/notes/:id", requireAuth, async (req, res) => {
-  try {
-    const note = await storage.getNote(req.params.id);
-    if (!note) return res.status(404).json({ error: "Note not found" });
-    // Allow update only if user is the one who uploaded it or is admin
-    if (note.uploadedBy !== req.session.user.id && req.session.user.role !== "admin") {
-      return res.status(403).json({ error: "Not authorized to update this note" });
-    }
-    const updated = await storage.updateNote(req.params.id, req.body);
-    res.json({ note: updated });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-app.delete("/api/notes/:id", requireAuth, async (req, res) => {
-  try {
-    const note = await storage.getNote(req.params.id);
-    if (!note) return res.status(404).json({ error: "Note not found" });
-    // Allow delete only if user is the one who uploaded it or is admin
-    if (note.uploadedBy !== req.session.user.id && req.session.user.role !== "admin") {
-      return res.status(403).json({ error: "Not authorized to delete this note" });
-    }
-    await storage.deleteNote(req.params.id);
-    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }

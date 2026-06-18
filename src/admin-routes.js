@@ -37,6 +37,25 @@ const upload = multer({
   },
 });
 
+const uploadImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB for images
+  fileFilter: (_req, file, cb) => {
+    const lower = file.originalname.toLowerCase();
+    if (
+      file.mimetype === "image/png" ||
+      lower.endsWith(".png") ||
+      file.mimetype === "image/jpeg" ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg")
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PNG and JPEG images are supported for cropping"));
+    }
+  },
+});
+
 function getFileType(filename) {
   const lower = (filename || "").toLowerCase();
   if (lower.endsWith(".pdf")) return "pdf";
@@ -531,31 +550,29 @@ export function buildAdminRouter(storage) {
         console.error("[parse-pdf] addDocument failed:", e.message);
       }
 
-      // ---- 3b. Render & save PNG snapshots of pages that have figure-questions ----
-      // We snapshot only the pages where at least one question has hasFigure=true
-      // (or where the page itself contains an image). Saves ~10× space vs. all pages.
-      // NEW: Extract figure bounds from each page's image metadata for cropped rendering.
+      // ---- 3b. Render & save cropped figure snapshots for questions that reference diagrams ----
       const figurePageSet = new Set();
       for (const q of questions) {
         if (q.hasFigure && Number.isInteger(q.pageNumber)) figurePageSet.add(q.pageNumber);
       }
-      for (const p of extracted.pages) {
-        if (p.hasImage) figurePageSet.add(p.pageNumber);
-      }
       const figurePages = [...figurePageSet];
 
-      // Build a map of page -> figure bounds for cropped rendering
-      // For now, we estimate bounds from the first image on each page (more sophisticated matching possible later)
+      // Build a map of page -> figure bounds for cropped rendering from extracted image metadata.
       const figureBoundsMap = new Map();
       for (const pageNum of figurePages) {
         const pageData = extracted.pages.find((p) => p.pageNumber === pageNum);
         if (pageData && pageData.imageBounds && pageData.imageBounds.length > 0) {
-          // Use first image's bounds as the figure region (in PDF coordinates)
-          // In production, could enhance this to match specific questions to specific images
-          const firstImageData = pageData.imageBounds[0];
-          // For now, use a reasonable estimate: [0, 0, pageWidth, pageHeight] will be computed by renderer
-          // TODO: Extract actual bounds from transform matrix
-          console.log(`[parse-pdf] page ${pageNum} has image metadata, will attempt cropped rendering`);
+          const union = pageData.imageBounds.reduce(
+            (acc, item) => ({
+              x0: Math.min(acc.x0, item.x0),
+              y0: Math.min(acc.y0, item.y0),
+              x1: Math.max(acc.x1, item.x1),
+              y1: Math.max(acc.y1, item.y1),
+            }),
+            { ...pageData.imageBounds[0] }
+          );
+          figureBoundsMap.set(pageNum, [union.x0, union.y0, union.x1, union.y1]);
+          console.log(`[parse-pdf] page ${pageNum} cropped render bounds: [${union.x0}, ${union.y0}, ${union.x1}, ${union.y1}]`);
         }
       }
 
@@ -563,8 +580,11 @@ export function buildAdminRouter(storage) {
       if (figurePages.length > 0) {
         try {
           console.log(`[parse-pdf] rendering ${figurePages.length} figure page(s):`, figurePages.join(", "));
-          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8, figureBoundsMap.size > 0 ? figureBoundsMap : null);
-          console.log(`[parse-pdf] rendered ${rendered.size}/${figurePages.length} page(s), saving…`);
+          // Render all pages that reference figures. If vector image bounds
+          // are present we'll crop via those; otherwise the pdf-render
+          // pixel-fallback will auto-crop the non-white bbox.
+          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8, figureBoundsMap);
+          console.log(`[parse-pdf] rendered ${rendered.size}/${figureBoundsMap.size} page(s), saving…`);
           for (const [pageNumber, pngBuf] of rendered) {
             try {
               const saved = await savePageImage({ docId: documentId, pageNumber, buffer: pngBuf });
@@ -622,6 +642,31 @@ export function buildAdminRouter(storage) {
       res.status(500).json({ error: String(e.message || e) });
     }
   });
+
+  // ---- Crop/replace a saved page-image (admin only) ----
+  // POST /api/admin/documents/:id/pages/:n/crop
+  // multipart/form-data field `file` (PNG/JPEG) — replaces the stored page image
+  r.post(
+    "/documents/:id/pages/:n/crop",
+    requireAdmin,
+    uploadImage.single("file"),
+    async (req, res) => {
+      try {
+        const docId = req.params.id;
+        const pageNumber = parseInt(req.params.n, 10);
+        if (!req.file || !req.file.buffer) return res.status(400).json({ error: "No file uploaded (field: file)" });
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) return res.status(400).json({ error: "Invalid page number" });
+        const doc = await storage.getDocument?.(docId);
+        if (!doc) return res.status(404).json({ error: "Document not found" });
+        // Overwrite the saved page image with the provided buffer
+        const saved = await savePageImage({ docId, pageNumber, buffer: req.file.buffer });
+        return res.json({ ok: true, path: saved.path, url: `/api/documents/${docId}/pages/${pageNumber}.png` });
+      } catch (e) {
+        console.error("[admin crop] error:", e);
+        return res.status(500).json({ error: String(e.message || e) });
+      }
+    }
+  );
 
   // ---- Serve a saved PDF (for inline review of figure questions) ----
   // GET /api/admin/documents/:id/pdf  — streams bytes inline

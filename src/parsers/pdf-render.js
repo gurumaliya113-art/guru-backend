@@ -7,6 +7,8 @@
 // If figureBounds is provided, renders only the cropped region of the figure.
 
 import * as mupdf from "mupdf";
+import { PNG } from "pngjs";
+import { createCanvas, loadImage } from "canvas";
 
 /**
  * Render selected pages of a PDF to PNG buffers.
@@ -47,9 +49,9 @@ export async function renderPagesToPng(pdfBuffer, pageNumbers, scale = 1.8, figu
       }
       
       // Create a pixmap for the (possibly cropped) bounds
-      const croppedWidth = (renderBounds[2] - renderBounds[0]) * scale;
-      const croppedHeight = (renderBounds[3] - renderBounds[1]) * scale;
-      
+      const croppedWidth = Math.max(1, Math.round((renderBounds[2] - renderBounds[0]) * scale));
+      const croppedHeight = Math.max(1, Math.round((renderBounds[3] - renderBounds[1]) * scale));
+
       // Translate matrix to account for crop offset
       const translateX = -renderBounds[0] * scale;
       const translateY = -renderBounds[1] * scale;
@@ -57,11 +59,45 @@ export async function renderPagesToPng(pdfBuffer, pageNumbers, scale = 1.8, figu
         mupdf.Matrix.translate(translateX, translateY),
         matrix
       );
-      
+
       // Args: (transform, colorspace, alpha, showExtras)
       pixmap = page.toPixmap(cropMatrix, mupdf.ColorSpace.DeviceRGB, false, true);
       const png = pixmap.asPNG();
-      out.set(n, Buffer.from(png));
+      let buf = Buffer.from(png);
+
+      // Pixel-fallback: if the cropped bounds produce almost-empty image (white margins),
+      // render full page then auto-crop the non-white bbox to avoid saving whole-page scans.
+      try {
+        const parsed = PNG.sync.read(buf);
+        const { width, height, data } = parsed;
+        let minX = width, minY = height, maxX = 0, maxY = 0;
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+            // consider a pixel non-white if not near-white or not transparent
+            if (a > 16 && (r < 250 || g < 250 || b < 250)) {
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        const area = (maxX - minX + 1) * (maxY - minY + 1);
+        if (minX <= maxX && minY <= maxY && area < width * height * 0.95) {
+          // crop to bbox
+          const canvas = createCanvas(maxX - minX + 1, maxY - minY + 1);
+          const ctx = canvas.getContext("2d");
+          const img = await loadImage(buf);
+          ctx.drawImage(img, -minX, -minY);
+          buf = canvas.toBuffer("image/png");
+        }
+      } catch (e) {
+        // keep original buf
+      }
+
+      out.set(n, buf);
       
       if (figureBoundsMap && figureBoundsMap.has(n)) {
         console.log(`[pdf-render] page ${n}: rendered cropped figure (${png.length} bytes)`);
