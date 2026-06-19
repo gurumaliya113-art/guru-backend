@@ -325,10 +325,8 @@ app.put("/api/profile", requireAuth, async (req, res) => {
   if (!user) return;
   try {
     const incoming = { ...(req.body || {}) };
-    const teacherInviteCode = incoming.teacherInviteCode;
     const rawPassword = incoming.password;
-    // Never persist the invite code or the raw password in the profile.
-    delete incoming.teacherInviteCode;
+    // Never persist the raw password in the profile.
     delete incoming.password;
     // Don't let a client clobber the stored hash directly.
     delete incoming.passwordHash;
@@ -345,25 +343,6 @@ app.put("/api/profile", requireAuth, async (req, res) => {
     // client. Without this, a single PUT from Onboarding would wipe out the
     // signup-time email + password hash, breaking subsequent password logins.
     const existing = (await storage.getProfile(user.id.toString())) || {};
-
-    // Invite-only check: a user can only become a teacher if they provide
-    // the configured invite code (or are already a teacher in storage).
-    if (incoming.role === "teacher") {
-      const alreadyTeacher = existing && existing.role === "teacher";
-      if (!alreadyTeacher) {
-        const expected = (process.env.TEACHER_INVITE_CODE || "").trim();
-        if (!expected) {
-          return res.status(503).json({
-            error: "Teacher registration is disabled. Ask the admin to set TEACHER_INVITE_CODE.",
-          });
-        }
-        if (!teacherInviteCode || teacherInviteCode.trim() !== expected) {
-          return res.status(403).json({
-            error: "Invalid teacher invite code. Please contact your admin.",
-          });
-        }
-      }
-    }
 
     const merged = {
       ...existing,

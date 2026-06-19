@@ -236,6 +236,7 @@ export const supabaseStorage = {
     const results = await Promise.all([
       supabase.from("attempts").delete().eq("user_id", userId),
       supabase.from("papers").delete().eq("user_id", userId),
+      supabase.from("memberships").delete().eq("student_id", userId),
       supabase.from("profiles").update(profileReset).eq("id", userId),
     ]);
 
