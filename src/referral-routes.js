@@ -10,7 +10,7 @@ import {
   summarizeRewards,
 } from "./referral.js";
 
-const SIGNUP_BASE_URL = process.env.PUBLIC_SIGNUP_URL || "https://gurtron.in/signup";
+const SIGNUP_BASE_URL = process.env.PUBLIC_SIGNUP_URL || "https://gurtron.in/onboarding";
 
 export function buildReferralRouter(storage) {
   const r = express.Router();
