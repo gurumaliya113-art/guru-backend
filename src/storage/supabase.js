@@ -9,6 +9,42 @@ function handleError(error) {
   }
 }
 
+// PostgREST caps a single .select() at a default max of 1000 rows. To return
+// ALL rows we page through with .range() until a short page is returned.
+// `build` receives a fresh query builder and may add filters/ordering.
+const PAGE_SIZE = 1000;
+async function fetchAllRows(table, build) {
+  const all = [];
+  let from = 0;
+  for (;;) {
+    let query = supabase.from(table).select("*");
+    if (typeof build === "function") query = build(query);
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+    handleError(error);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
+// Insert/upsert large arrays in chunks so we never hit payload limits and so
+// the chained read-back is never silently truncated at 1000 rows.
+async function upsertInChunks(table, rows, options) {
+  const inserted = [];
+  for (let i = 0; i < rows.length; i += PAGE_SIZE) {
+    const chunk = rows.slice(i, i + PAGE_SIZE);
+    const { data, error } = await supabase
+      .from(table)
+      .upsert(chunk, options)
+      .select();
+    handleError(error);
+    if (data) inserted.push(...data);
+  }
+  return inserted;
+}
+
 // Convert camelCase to snake_case (handles acronyms properly)
 function toSnakeCase(obj) {
   if (!obj || typeof obj !== 'object') return obj;
@@ -103,9 +139,8 @@ export const supabaseStorage = {
   },
 
   async getAllProfiles() {
-    const { data, error } = await supabase.from("profiles").select("*");
-    handleError(error);
-    return data ? data.map(toCamelCase) : [];
+    const data = await fetchAllRows("profiles");
+    return data.map(toCamelCase);
   },
 
   async findAccountByEmail(email) {
@@ -249,19 +284,14 @@ export const supabaseStorage = {
   },
 
   async getQuestions() {
-    const { data, error } = await supabase.from("questions").select("*");
-    handleError(error);
-    return data ? data.map(toCamelCase) : [];
+    const data = await fetchAllRows("questions");
+    return data.map(toCamelCase);
   },
 
   async addQuestions(questions) {
     const dbPayload = questions.map(q => toSnakeCase(q));
-    const { data, error } = await supabase
-      .from("questions")
-      .upsert(dbPayload, { onConflict: "id" })
-      .select();
-    handleError(error);
-    return data ? data.map(toCamelCase) : [];
+    const data = await upsertInChunks("questions", dbPayload, { onConflict: "id" });
+    return data.map(toCamelCase);
   },
 
   async updateQuestion(id, updates) {
@@ -374,12 +404,10 @@ export const supabaseStorage = {
 
   // ===== MEMBERSHIPS =====
   async getMemberships() {
-    const { data, error } = await supabase
-      .from("memberships")
-      .select("*")
-      .order("created_at", { ascending: false });
-    handleError(error);
-    return data ? data.map(toCamelCase) : [];
+    const data = await fetchAllRows("memberships", (q) =>
+      q.order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
   },
 
   async getMembershipsByClass(classId) {
@@ -706,5 +734,144 @@ export const supabaseStorage = {
 
   async getTest(id) {
     return await jsonStorage.getTest?.(id) || null;
+  },
+
+  // ===== REFERRALS & COMMISSIONS =====
+  async getProfileByReferralCode(code) {
+    const norm = String(code || "").trim();
+    if (!norm) return null;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .ilike("referral_code", norm)
+      .maybeSingle();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async addReferral(r) {
+    const dbPayload = toSnakeCase({ id: r.id || `ref_${crypto.randomBytes(5).toString("hex")}`, ...r });
+    const { data, error } = await supabase
+      .from("referrals")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getReferralByReferredUser(userId) {
+    const { data, error } = await supabase
+      .from("referrals")
+      .select("*")
+      .eq("referred_user_id", userId)
+      .maybeSingle();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getReferralsByReferrer(referrerId) {
+    const data = await fetchAllRows("referrals", (q) =>
+      q.eq("referrer_id", referrerId).order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async getAllReferrals() {
+    const data = await fetchAllRows("referrals", (q) =>
+      q.order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async addCommission(c) {
+    const dbPayload = toSnakeCase({ id: c.id || `com_${crypto.randomBytes(5).toString("hex")}`, ...c });
+    const { data, error } = await supabase
+      .from("commission_transactions")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getCommissionByOrderId(orderId) {
+    if (!orderId) return null;
+    const { data, error } = await supabase
+      .from("commission_transactions")
+      .select("*")
+      .eq("order_id", orderId)
+      .maybeSingle();
+    if (error && error.code !== "PGRST116") handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getCommissionsByReferrer(referrerId) {
+    const data = await fetchAllRows("commission_transactions", (q) =>
+      q.eq("referrer_id", referrerId).order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async getAllCommissions() {
+    const data = await fetchAllRows("commission_transactions", (q) =>
+      q.order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async updateCommission(id, updates) {
+    const dbPayload = toSnakeCase({ ...updates, updatedAt: new Date().toISOString() });
+    const { data, error } = await supabase
+      .from("commission_transactions")
+      .update(dbPayload)
+      .eq("id", id)
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async addPayout(p) {
+    const dbPayload = toSnakeCase({ id: p.id || `pay_${crypto.randomBytes(5).toString("hex")}`, ...p });
+    const { data, error } = await supabase
+      .from("payouts")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getPayoutsByUser(userId) {
+    const data = await fetchAllRows("payouts", (q) =>
+      q.eq("user_id", userId).order("paid_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async getAllPayouts() {
+    const data = await fetchAllRows("payouts", (q) =>
+      q.order("paid_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
+  },
+
+  async addStudentReward(r) {
+    const dbPayload = toSnakeCase({ id: r.id || `rew_${crypto.randomBytes(5).toString("hex")}`, ...r });
+    const { data, error } = await supabase
+      .from("student_rewards")
+      .insert([dbPayload])
+      .select()
+      .single();
+    handleError(error);
+    return data ? toCamelCase(data) : null;
+  },
+
+  async getStudentRewardsByUser(userId) {
+    const data = await fetchAllRows("student_rewards", (q) =>
+      q.eq("user_id", userId).order("created_at", { ascending: false })
+    );
+    return data.map(toCamelCase);
   },
 };

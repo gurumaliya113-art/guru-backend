@@ -5,6 +5,7 @@ import { jsonStorage } from "../storage/json.js";
 import { supabaseStorage } from "../storage/supabase.js";
 import { supabase } from "../supabase.js";
 import { hashPassword, verifyPassword } from "../password.js";
+import { generateReferralCode } from "../referral.js";
 
 const router = express.Router();
 const storage = process.env.STORAGE === "supabase" && supabase ? supabaseStorage : jsonStorage;
@@ -21,6 +22,14 @@ async function ensureProfile(userId, email, googleData = null) {
   const name = googleData?.name || email.split("@")[0] || "Student";
   const picture = googleData?.picture || null;
 
+  // Every user gets a unique referral code at creation time.
+  let referralCode = "";
+  try {
+    referralCode = await generateReferralCode(storage, name);
+  } catch (e) {
+    console.warn("[referral] code generation failed at signup:", e?.message || e);
+  }
+
   const profile = {
     name,
     email,
@@ -32,6 +41,7 @@ async function ensureProfile(userId, email, googleData = null) {
     totalPoints: 0,
     badges: [],
     rank: 0,
+    referralCode,
     isOnboarded: false,
   };
 

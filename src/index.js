@@ -17,9 +17,12 @@ import authRoutes from "./routes/auth.js";
 import { jsonStorage } from "./storage/json.js";
 import { supabaseStorage } from "./storage/supabase.js";
 import { buildAdminRouter } from "./admin-routes.js";
+import { buildReferralRouter } from "./referral-routes.js";
+import { createCommissionForOrder, ensureReferralCode, recordReferral } from "./referral.js";
 import { getPageImageBytes } from "./storage/pdf-storage.js";
 import { saveCaptureImage, CAPTURES_LOCAL_DIR } from "./storage/capture-storage.js";
 import { hashPassword } from "./password.js";
+import { answerWithGemini } from "./parsers/gemini.js";
 import fs from "fs";
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
@@ -302,6 +305,9 @@ app.get("/api/documents/:id/pages/:n.png", async (req, res) => {
 // Admin routes (login, stats, questions CRUD, PDF parse)
 app.use("/api/admin", buildAdminRouter(storage));
 
+// Referral & Commission routes (user-facing)
+app.use("/api/referral", buildReferralRouter(storage));
+
 // --- Profile ---
 function sanitizeProfile(profile) {
   if (!profile) return profile;
@@ -326,6 +332,9 @@ app.put("/api/profile", requireAuth, async (req, res) => {
   try {
     const incoming = { ...(req.body || {}) };
     const rawPassword = incoming.password;
+    // Referral code the user is claiming they were referred by (optional).
+    const referredByCode = incoming.referredByCode;
+    delete incoming.referredByCode;
     // Never persist the raw password in the profile.
     delete incoming.password;
     // Don't let a client clobber the stored hash directly.
@@ -353,7 +362,33 @@ app.put("/api/profile", requireAuth, async (req, res) => {
       passwordHash: incoming.passwordHash || existing.passwordHash,
     };
 
-    const saved = await storage.saveProfile(user.id.toString(), merged);
+    let saved = await storage.saveProfile(user.id.toString(), merged);
+
+    // Ensure the user has their own unique referral code.
+    saved = await ensureReferralCode(storage, user.id.toString(), saved);
+
+    // If they entered a referral code, record the (permanent) relationship.
+    // Best-effort: invalid/self/duplicate codes are silently ignored so they
+    // never block onboarding.
+    if (referredByCode) {
+      try {
+        const result = await recordReferral(storage, {
+          referredUserId: user.id.toString(),
+          referredProfile: saved,
+          code: referredByCode,
+          source: "code",
+        });
+        if (result.ok && result.referral) {
+          saved = await storage.saveProfile(user.id.toString(), {
+            ...saved,
+            referredBy: result.referral.referralCode,
+          });
+        }
+      } catch (err) {
+        console.warn("[referral] recordReferral failed:", err?.message || err);
+      }
+    }
+
     res.json({ profile: sanitizeProfile(saved) });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
@@ -1139,6 +1174,20 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
       },
     };
     await storage.saveProfile(user.id.toString(), updated);
+
+    // Referral commission: if this buyer was referred by a teacher, create a
+    // PENDING commission (10%). Best-effort — never block the payment response.
+    try {
+      const purchaseAmountInr = (Number(plan.amount) || 0) / 100; // paise -> INR
+      await createCommissionForOrder(storage, {
+        buyerId: user.id.toString(),
+        orderId: razorpay_order_id,
+        purchaseAmount: purchaseAmountInr,
+      });
+    } catch (err) {
+      console.warn("[referral] commission creation failed:", err?.message || err);
+    }
+
     res.json({ ok: true, subscription: updated.subscription });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
@@ -1207,6 +1256,37 @@ Keep responses concise (1-2 paragraphs) unless asked for more detail.`;
     res.json({ response: assistantMessage });
   } catch (e) {
     console.error("[ai/chat] Groq API error:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.post("/api/ai/dpp-chat", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+
+  try {
+    const { message, conversationHistory, subject, chapter } = req.body;
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const systemPrompt = `You are a real-time Gemini tutor for DPP practice.
+Help the student solve the current chapter question, show the reasoning, and keep the answer practical.
+If the user asks for only the final answer, provide it succinctly.
+If they ask for a hint, give a small hint first.
+Subject context: ${subject || "Unknown"}
+Chapter context: ${chapter || "Unknown"}`;
+
+    const response = await answerWithGemini({
+      message,
+      conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
+      modelName: process.env.GEMINI_DPP_CHAT_MODEL || process.env.GEMINI_DPP_MODEL || process.env.GEMINI_MODEL || "gemini-3-flash-preview",
+      systemInstruction: systemPrompt,
+    });
+
+    res.json({ response });
+  } catch (e) {
+    console.error("[ai/dpp-chat] Gemini API error:", e);
     res.status(500).json({ error: String(e.message || e) });
   }
 });

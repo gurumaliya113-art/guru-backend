@@ -4,7 +4,7 @@ import multer from "multer";
 import crypto from "crypto";
 import { adminLogin, adminLogout, requireAdmin } from "./auth.js";
 import { parseHeuristic } from "./parsers/heuristic.js";
-import { parseWithGemini, isGeminiAvailable } from "./parsers/gemini.js";
+import { parseWithGemini, parseWithGeminiVision, isGeminiAvailable } from "./parsers/gemini.js";
 import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
 import { extractPdfPages } from "./parsers/pdf-extract.js";
 import { extractRawPdfPages } from "./parsers/pdf-raw.js";
@@ -16,6 +16,7 @@ import {
   savePageImage,
   newDocumentId,
 } from "./storage/pdf-storage.js";
+import { summarizeCommissions, cancelCommissionForOrder } from "./referral.js";
 
 const upload = multer({
   storage: multer.memoryStorage(), // we never persist the PDF — only its extracted text
@@ -25,6 +26,11 @@ const upload = multer({
     if (
       file.mimetype === "application/pdf" ||
       lower.endsWith(".pdf") ||
+      file.mimetype === "image/png" ||
+      file.mimetype === "image/jpeg" ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       lower.endsWith(".docx") ||
       file.mimetype === "application/msword" ||
@@ -32,7 +38,7 @@ const upload = multer({
     ) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF and Word documents (.doc, .docx) are supported"));
+      cb(new Error("Only PDF, image, and Word documents (.doc, .docx) are supported"));
     }
   },
 });
@@ -61,7 +67,16 @@ function getFileType(filename) {
   if (lower.endsWith(".pdf")) return "pdf";
   if (lower.endsWith(".docx")) return "docx";
   if (lower.endsWith(".doc")) return "doc";
+  if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image";
   return "unknown";
+}
+
+function getMimeType(filename, mimetype) {
+  if (mimetype) return mimetype;
+  const lower = (filename || "").toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return "application/octet-stream";
 }
 
 export function buildAdminRouter(storage) {
@@ -411,7 +426,7 @@ export function buildAdminRouter(storage) {
   //
   // Returns: { documentId?, parser, pageCount, textLength, isScanned, questions, saved }
   r.post("/parse-pdf", requireAdmin, upload.single("file"), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No PDF uploaded (field: file)" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded (field: file)" });
 
     const requestedMode = (req.body?.mode || req.query?.mode || "auto").toLowerCase();
     // saveQuestions: controls whether extracted questions are inserted into the bank.
@@ -426,34 +441,70 @@ export function buildAdminRouter(storage) {
     };
 
     try {
-      // ---- 1. Extract text from the uploaded document per-page ----
       const fileType = getFileType(req.file.originalname);
+      const documentId = newDocumentId();
+      const isImageUpload = fileType === "image";
+
+      // ---- 1. Extract text or parse image input ----
       console.log(`[parse-pdf] Starting extraction for ${fileType} with mode: ${requestedMode}`);
       const extracted = fileType === "pdf"
         ? requestedMode === "raw"
           ? await extractRawPdfPages(req.file.buffer)
           : await extractPdfPages(req.file.buffer)
-        : await extractDocxPages(req.file.buffer);
-      console.log(`[parse-pdf] Extraction complete: ${extracted.pageCount} pages, ${extracted.textLength} chars`);
-      const text = extracted.fullText.trim();
-      const pageCount = extracted.pageCount;
-      const pagesHaveImages = extracted.pages.some((p) => p.hasImage);
-      const totalChars = extracted.pages.reduce((s, p) => s + (p.text?.length || 0), 0);
+        : fileType === "docx"
+          ? await extractDocxPages(req.file.buffer)
+          : null;
+
+      const text = extracted?.fullText?.trim() || "";
+      const pageCount = extracted?.pageCount || (isImageUpload ? 1 : 0);
+      const pagesHaveImages = extracted?.pages?.some((p) => p.hasImage) || isImageUpload;
+      const totalChars = extracted?.pages?.reduce((s, p) => s + (p.text?.length || 0), 0) || 0;
       const isScanned = fileType === "pdf" && totalChars < 100;
 
-      if (isScanned) {
-        return res.status(422).json({
-          error: "This PDF appears to be scanned (no extractable text). OCR is not yet enabled — upload a digital/text PDF, or enable an OCR worker.",
-          isScanned: true,
+      let questions = [];
+      let parserUsed = "heuristic";
+
+      const saveAsDocument = async (storagePath, storageBackend) => {
+        const doc = {
+          id: documentId,
+          filename: req.file.originalname || "upload",
+          storagePath,
+          storageBackend,
+          sizeBytes: req.file.size || req.file.buffer.length || null,
           pageCount,
           textLength: text.length,
-        });
-      }
+          isScanned: Boolean(isScanned),
+          parser: parserUsed,
+          status: "ready",
+          uploadedBy: req.session?.user?.id || null,
+          subject: meta.subject,
+          examType: meta.examType,
+          classLevel: meta.classLevel,
+          notes: meta.notes,
+          createdAt: new Date().toISOString(),
+        };
+        try {
+          await storage.addDocument?.(doc);
+        } catch (e) {
+          console.error("[parse-pdf] addDocument failed:", e.message);
+        }
+      };
+
+      const saveQuestionsWithDocument = async (list) => {
+        const linked = list.map((q) => ({
+          ...q,
+          id: q.id || "q_" + crypto.randomBytes(4).toString("hex"),
+          documentId,
+          classLevel: q.classLevel || meta.classLevel || undefined,
+          createdAt: q.createdAt || new Date().toISOString(),
+        }));
+        await storage.addQuestions(linked);
+        return linked;
+      };
 
       // ---- 2. Decide which parser to use ----
+      // dpp: Gemini 2.5 Pro vision for camera images / scanned PDFs.
       // auto: groq if available, else heuristic. Gemini only if explicitly asked.
-      let parserUsed;
-      let questions = [];
       const tryGroq = async () => {
         questions = await parseWithGroq(text);
         parserUsed = "groq";
@@ -463,15 +514,105 @@ export function buildAdminRouter(storage) {
         parserUsed = "heuristic";
       };
       const tryGemini = async () => {
-        questions = await parseWithGemini(text);
-        parserUsed = "gemini";
+        questions = await parseWithGemini(text, { modelName: process.env.GEMINI_MODEL || "gemini-3-flash-preview", source: "pdf-ai" });
+        parserUsed = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+      };
+      const tryDppGemini = async () => {
+        questions = [];
+        parserUsed = process.env.GEMINI_DPP_MODEL || process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+        const fastPageCap = Number(process.env.DPP_FAST_PAGE_CAP || 2);
+
+        if (isImageUpload) {
+          try {
+            questions = await parseWithGeminiVision({
+              imageBuffer: req.file.buffer,
+              mimeType: getMimeType(req.file.originalname, req.file.mimetype),
+              modelName: parserUsed,
+              pageNumber: 1,
+              source: "dpp-ai",
+            });
+            return;
+          } catch (e) {
+            console.warn(`[parse-pdf] Gemini vision failed, falling back to heuristic: ${e.message}`);
+            questions = parseHeuristic(text);
+            parserUsed = "heuristic";
+            return;
+          }
+        }
+
+        if (fileType === "pdf") {
+          if (!text || isScanned) {
+            const pageNumbers = Array.from({ length: Math.min(pageCount, fastPageCap) }, (_, i) => i + 1);
+            const rendered = await renderPagesToPng(req.file.buffer, pageNumbers, 1.8);
+            try {
+              for (const [pageNumber, pngBuffer] of rendered.entries()) {
+                const pageQuestions = await parseWithGeminiVision({
+                  imageBuffer: pngBuffer,
+                  mimeType: "image/png",
+                  modelName: parserUsed,
+                  pageNumber,
+                  source: "dpp-ai",
+                });
+                questions.push(...pageQuestions);
+              }
+              if (pageCount > fastPageCap) {
+                console.warn(`[parse-pdf] fast DPP cap hit: rendered ${fastPageCap}/${pageCount} pages to keep the upload responsive`);
+              }
+              return;
+            } catch (e) {
+              console.warn(`[parse-pdf] Gemini vision page parse failed, falling back to Groq: ${e.message}`);
+              if (isGroqAvailable()) {
+                questions = await parseWithGroq(text);
+                parserUsed = "groq";
+                return;
+              }
+              questions = parseHeuristic(text);
+              parserUsed = "heuristic";
+              return;
+            }
+          }
+
+          try {
+            questions = await parseWithGemini(text, {
+              modelName: parserUsed,
+              source: "dpp-ai",
+            });
+            return;
+          } catch (e) {
+            console.warn(`[parse-pdf] Gemini text PDF parse failed, falling back to Groq: ${e.message}`);
+            if (isGroqAvailable()) {
+              questions = await parseWithGroq(text);
+              parserUsed = "groq";
+              return;
+            }
+            questions = parseHeuristic(text);
+            parserUsed = "heuristic";
+            return;
+          }
+        }
+
+        try {
+          questions = await parseWithGemini(text, { modelName: parserUsed, source: "dpp-ai" });
+          return;
+        } catch (e) {
+          console.warn(`[parse-pdf] Gemini text parse failed, falling back to Groq: ${e.message}`);
+          if (isGroqAvailable()) {
+            questions = await parseWithGroq(text);
+            parserUsed = "groq";
+            return;
+          }
+          questions = parseHeuristic(text);
+          parserUsed = "heuristic";
+        }
       };
       const tryRaw = () => {
         questions = parseHeuristic(text);
         parserUsed = "raw";
       };
 
-      if (requestedMode === "groq") {
+      if (requestedMode === "dpp") {
+        await tryDppGemini();
+      } else if (requestedMode === "groq") {
         await tryGroq();
       } else if (requestedMode === "gemini" || requestedMode === "ai") {
         if (!isGeminiAvailable()) {
@@ -497,25 +638,29 @@ export function buildAdminRouter(storage) {
         }
       }
 
-      // ---- 3. Always persist the PDF + documents row (so uploads are tracked) ----
-      const documentId = newDocumentId();
-      let storageInfo;
-      try {
-        storageInfo = await saveDocumentBytes({
-          id: documentId,
-          filename: req.file.originalname,
-          buffer: req.file.buffer,
-        });
-      } catch (e) {
-        console.error("[parse-pdf] PDF byte storage failed:", e.message);
-        return res.status(500).json({
-          error: `Failed to save PDF bytes: ${e.message}`,
-          parser: parserUsed,
-          questions,
-        });
+      // ---- 3. Persist the uploaded asset so the document can be reviewed later ----
+      let storageInfo = null;
+      if (isImageUpload) {
+        const saved = await savePageImage({ docId: documentId, pageNumber: 1, buffer: req.file.buffer });
+        storageInfo = { path: saved.path, backend: saved.backend, sizeBytes: saved.sizeBytes };
+      } else {
+        try {
+          storageInfo = await saveDocumentBytes({
+            id: documentId,
+            filename: req.file.originalname,
+            buffer: req.file.buffer,
+          });
+        } catch (e) {
+          console.error("[parse-pdf] PDF byte storage failed:", e.message);
+          return res.status(500).json({
+            error: `Failed to save PDF bytes: ${e.message}`,
+            parser: parserUsed,
+            questions,
+          });
+        }
       }
 
-      if (requestedMode === "raw") {
+      if (requestedMode === "raw" && !isImageUpload) {
         try {
           await storage.savePdfPages?.({
             pdfName: req.file.originalname || "upload.pdf",
@@ -526,58 +671,56 @@ export function buildAdminRouter(storage) {
         }
       }
 
-      const doc = {
-        id: documentId,
-        filename: req.file.originalname || "upload.pdf",
-        storagePath: storageInfo.path,
-        storageBackend: storageInfo.backend,
-        sizeBytes: storageInfo.sizeBytes,
-        pageCount,
-        textLength: text.length,
-        isScanned: false,
-        parser: parserUsed,
-        status: "ready",
-        uploadedBy: req.session?.user?.id || null,
-        subject: meta.subject,
-        examType: meta.examType,
-        classLevel: meta.classLevel,
-        notes: meta.notes,
-        createdAt: new Date().toISOString(),
-      };
-      try {
-        await storage.addDocument?.(doc);
-      } catch (e) {
-        console.error("[parse-pdf] addDocument failed:", e.message);
+      await saveAsDocument(storageInfo.path, storageInfo.backend);
+
+      // ---- 3b. Render & save page snapshots for questions that reference or contain diagrams ----
+      const pageHasImageMap = new Map();
+      if (extracted?.pages) {
+        for (const page of extracted.pages) {
+          pageHasImageMap.set(page.pageNumber, Boolean(page.hasImage));
+        }
       }
 
-      // ---- 3b. Render & save cropped figure snapshots for questions that reference diagrams ----
       const figurePageSet = new Set();
       for (const q of questions) {
-        if (q.hasFigure && Number.isInteger(q.pageNumber)) figurePageSet.add(q.pageNumber);
+        if (!Number.isInteger(q.pageNumber)) continue;
+        if (q.hasFigure || pageHasImageMap.get(q.pageNumber)) {
+          figurePageSet.add(q.pageNumber);
+        }
       }
       const figurePages = [...figurePageSet];
 
+      const likelyFigureText = (q) => {
+        const text = `${q?.text || ""} ${(Array.isArray(q?.options) ? q.options.join(" ") : "")}`.toLowerCase();
+        return /figure|diagram|graph|chart|table|circuit|shown below|given below|image|illustration|labelled|labeling|labels?/.test(text);
+      };
+
       // Build a map of page -> figure bounds for cropped rendering from extracted image metadata.
       const figureBoundsMap = new Map();
-      for (const pageNum of figurePages) {
-        const pageData = extracted.pages.find((p) => p.pageNumber === pageNum);
-        if (pageData && pageData.imageBounds && pageData.imageBounds.length > 0) {
-          const union = pageData.imageBounds.reduce(
-            (acc, item) => ({
-              x0: Math.min(acc.x0, item.x0),
-              y0: Math.min(acc.y0, item.y0),
-              x1: Math.max(acc.x1, item.x1),
-              y1: Math.max(acc.y1, item.y1),
-            }),
-            { ...pageData.imageBounds[0] }
-          );
-          figureBoundsMap.set(pageNum, [union.x0, union.y0, union.x1, union.y1]);
-          console.log(`[parse-pdf] page ${pageNum} cropped render bounds: [${union.x0}, ${union.y0}, ${union.x1}, ${union.y1}]`);
+      if (extracted?.pages) {
+        for (const pageNum of figurePages) {
+          const pageData = extracted.pages.find((p) => p.pageNumber === pageNum);
+          if (pageData && pageData.imageBounds && pageData.imageBounds.length > 0) {
+            const union = pageData.imageBounds.reduce(
+              (acc, item) => ({
+                x0: Math.min(acc.x0, item.x0),
+                y0: Math.min(acc.y0, item.y0),
+                x1: Math.max(acc.x1, item.x1),
+                y1: Math.max(acc.y1, item.y1),
+              }),
+              { ...pageData.imageBounds[0] }
+            );
+            figureBoundsMap.set(pageNum, [union.x0, union.y0, union.x1, union.y1]);
+            console.log(`[parse-pdf] page ${pageNum} cropped render bounds: [${union.x0}, ${union.y0}, ${union.x1}, ${union.y1}]`);
+          }
         }
       }
 
       const pageImageMap = {}; // pageNumber -> public URL
-      if (figurePages.length > 0) {
+      if (isImageUpload) {
+        pageImageMap[1] = `/api/documents/${documentId}/pages/1.png`;
+      }
+      if (figurePages.length > 0 && !isImageUpload && extracted?.pages) {
         try {
           console.log(`[parse-pdf] rendering ${figurePages.length} figure page(s):`, figurePages.join(", "));
           // Render all pages that reference figures. If vector image bounds
@@ -599,24 +742,35 @@ export function buildAdminRouter(storage) {
         }
       }
 
+      const fallbackFigurePages = [...figurePages];
+
       // Attach pageImageUrl to every question that has a saved snapshot
       questions = questions.map((q) => {
-        const url = q.pageNumber ? pageImageMap[q.pageNumber] : null;
-        return url ? { ...q, pageImageUrl: url } : q;
+        let pageNumber = Number.isInteger(q.pageNumber) ? q.pageNumber : null;
+        let url = pageNumber ? pageImageMap[pageNumber] : null;
+
+        if (!url && fallbackFigurePages.length > 0 && (q.hasFigure || likelyFigureText(q) || fallbackFigurePages.length === 1)) {
+          const inferredPage = pageNumber || fallbackFigurePages.shift();
+          if (inferredPage) {
+            pageNumber = inferredPage;
+            url = pageImageMap[inferredPage] || null;
+          }
+        }
+
+        if (!url) return q;
+        return {
+          ...q,
+          pageNumber: pageNumber || q.pageNumber,
+          hasFigure: q.hasFigure || Boolean(pageHasImageMap.get(pageNumber || q.pageNumber)) || likelyFigureText(q),
+          pageImageUrl: url,
+        };
       });
 
       // ---- 4. Optionally save extracted questions (only if save=1) ----
       let questionsSaved = false;
       if (saveQuestions && questions.length > 0) {
-        const linked = questions.map((q) => ({
-          ...q,
-          id: q.id || "q_" + crypto.randomBytes(4).toString("hex"),
-          documentId,
-          classLevel: q.classLevel || meta.classLevel || undefined,
-          createdAt: q.createdAt || new Date().toISOString(),
-        }));
         try {
-          await storage.addQuestions(linked);
+          await saveQuestionsWithDocument(questions);
           questionsSaved = true;
         } catch (e) {
           console.error("[parse-pdf] addQuestions failed:", e.message);
@@ -685,6 +839,165 @@ export function buildAdminRouter(storage) {
       res.send(buf);
     } catch (e) {
       console.error("[documents/:id/pdf] error:", e);
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // ===== REFERRAL MANAGEMENT =====
+  // Build a quick id -> profile map for name/role enrichment.
+  async function profileMap() {
+    const all = (await storage.getAllProfiles?.()) || [];
+    const map = {};
+    for (const p of all) map[String(p.id)] = p;
+    return map;
+  }
+
+  // Dashboard summary cards.
+  r.get("/referral/summary", requireAdmin, async (_req, res) => {
+    try {
+      const [referrals, commissions] = await Promise.all([
+        storage.getAllReferrals?.() ?? [],
+        storage.getAllCommissions?.() ?? [],
+      ]);
+      const totals = summarizeCommissions(commissions);
+      res.json({
+        totalReferralUsers: referrals.length,
+        teachersReferred: referrals.filter((x) => x.referredRole === "teacher").length,
+        studentsReferred: referrals.filter((x) => x.referredRole === "student").length,
+        pendingCommission: totals.pending,
+        approvedCommission: totals.approved,
+        paidCommission: totals.paid,
+        totalCommissionAmount: totals.lifetime,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Referral list: referrer name, code, referred user, role, signup date, status.
+  r.get("/referral/list", requireAdmin, async (_req, res) => {
+    try {
+      const [referrals, map] = await Promise.all([
+        storage.getAllReferrals?.() ?? [],
+        profileMap(),
+      ]);
+      const rows = referrals.map((ref) => ({
+        id: ref.id,
+        referrerName: map[String(ref.referrerId)]?.name || "User",
+        referralCode: ref.referralCode,
+        referredUser: map[String(ref.referredUserId)]?.name || "User",
+        role: ref.referredRole || map[String(ref.referredUserId)]?.role || "student",
+        signupDate: ref.createdAt,
+        status: "joined",
+      }));
+      res.json({ referrals: rows });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Commission list with referrer + buyer names.
+  r.get("/referral/commissions", requireAdmin, async (_req, res) => {
+    try {
+      const [commissions, map] = await Promise.all([
+        storage.getAllCommissions?.() ?? [],
+        profileMap(),
+      ]);
+      const rows = commissions.map((c) => ({
+        id: c.id,
+        referrer: map[String(c.referrerId)]?.name || "User",
+        referrerId: c.referrerId,
+        buyer: map[String(c.buyerId)]?.name || "User",
+        orderId: c.orderId,
+        purchaseAmount: c.purchaseAmount,
+        commissionPercent: c.commissionPercent,
+        commissionAmount: c.commissionAmount,
+        status: c.status,
+        date: c.createdAt,
+      }));
+      res.json({ commissions: rows });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Update a single commission's status (approve / cancel / re-pending).
+  r.post("/referral/commissions/:id/status", requireAdmin, async (req, res) => {
+    try {
+      const { status } = req.body || {};
+      if (!["pending", "approved", "paid", "cancelled"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      const updated = await storage.updateCommission(req.params.id, { status });
+      if (!updated) return res.status(404).json({ error: "Commission not found" });
+      res.json({ commission: updated });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Cancel commission for a refunded order.
+  r.post("/referral/refund", requireAdmin, async (req, res) => {
+    try {
+      const { orderId } = req.body || {};
+      if (!orderId) return res.status(400).json({ error: "orderId is required" });
+      const cancelled = await cancelCommissionForOrder(storage, orderId);
+      res.json({ commission: cancelled });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Payout history.
+  r.get("/referral/payouts", requireAdmin, async (_req, res) => {
+    try {
+      const [payouts, map] = await Promise.all([
+        storage.getAllPayouts?.() ?? [],
+        profileMap(),
+      ]);
+      const rows = payouts.map((p) => ({
+        id: p.id,
+        userId: p.userId,
+        userName: map[String(p.userId)]?.name || "User",
+        amount: p.amount,
+        transactionNote: p.transactionNote,
+        paidAt: p.paidAt,
+      }));
+      res.json({ payouts: rows });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Pay out a teacher: marks their APPROVED commissions as paid and records a
+  // payout row. If `amount` is omitted, pays the full approved balance.
+  r.post("/referral/payout", requireAdmin, async (req, res) => {
+    try {
+      const { userId, transactionNote } = req.body || {};
+      if (!userId) return res.status(400).json({ error: "userId is required" });
+
+      const commissions = (await storage.getCommissionsByReferrer?.(userId)) || [];
+      const approved = commissions.filter((c) => c.status === "approved");
+      if (approved.length === 0) {
+        return res.status(400).json({ error: "No approved commissions to pay out." });
+      }
+
+      let total = 0;
+      for (const c of approved) {
+        await storage.updateCommission(c.id, { status: "paid" });
+        total += Number(c.commissionAmount) || 0;
+      }
+      total = Math.round(total * 100) / 100;
+
+      const payout = await storage.addPayout({
+        userId: String(userId),
+        amount: total,
+        transactionNote: transactionNote || `Payout for ${approved.length} commission(s)`,
+        paidAt: new Date().toISOString(),
+      });
+
+      res.json({ payout, paidCount: approved.length, amount: total });
+    } catch (e) {
       res.status(500).json({ error: String(e.message || e) });
     }
   });
