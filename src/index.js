@@ -1045,14 +1045,23 @@ const RZP_DEFAULT_AMOUNT = parseInt(process.env.RAZORPAY_PLAN_AMOUNT_PAISE || "4
 const RZP_DEFAULT_VALIDITY_DAYS = parseInt(process.env.RAZORPAY_PLAN_VALIDITY_DAYS || "365", 10);
 
 const RZP_PLANS = {
+  "7d-19": { amount: 1900, validityDays: 7, label: "7 days", description: "7-day full access" },
+  "30d-59": { amount: 5900, validityDays: 30, label: "1 month", description: "30-day full access" },
+  "3m-149": { amount: 14900, validityDays: 90, label: "3 months", description: "3-month full access" },
+  "lifetime-499": { amount: 49900, validityDays: null, label: "Lifetime", description: "Unlimited lifetime access" },
+  // Legacy plan ids kept so older orders/links still resolve.
   "7d-29": { amount: 2900, validityDays: 7, label: "7 days", description: "7-day access" },
-  "30d-99": { amount: 9900, validityDays: 30, label: "30 days", description: "30-day access" },
+  "30d-99": { amount: 9900, validityDays: 30, label: "1 month", description: "30-day access" },
   "3m-249": { amount: 24900, validityDays: 90, label: "3 months", description: "3-month access" },
   "lifetime-999": { amount: 99900, validityDays: null, label: "Lifetime", description: "Unlimited access" },
   "yearly-49": { amount: RZP_DEFAULT_AMOUNT, validityDays: RZP_DEFAULT_VALIDITY_DAYS, label: "1 year", description: "Yearly subscription" },
 };
 
-const RZP_DEFAULT_PLAN = "30d-99";
+const RZP_DEFAULT_PLAN = "30d-59";
+
+// Plans surfaced to the client (in display order). Legacy ids above are
+// intentionally excluded so the pricing page only shows current offers.
+const RZP_VISIBLE_PLAN_IDS = ["7d-19", "30d-59", "3m-149", "lifetime-499"];
 
 function razorpayConfigured() {
   return !!(RZP_KEY_ID && RZP_KEY_SECRET);
@@ -1063,20 +1072,31 @@ function getPlan(planId = RZP_DEFAULT_PLAN) {
 }
 
 app.get("/api/payments/config", (_req, res) => {
+  const subtitles = {
+    "7d-19": "Trial week",
+    "30d-59": "Most popular",
+    "3m-149": "Best value",
+    "lifetime-499": "Pay once, forever",
+  };
   res.json({
     configured: razorpayConfigured(),
     keyId: RZP_KEY_ID || null,
     amount: getPlan().amount,
     currency: RZP_CURRENCY,
     plan: RZP_DEFAULT_PLAN,
-    plans: Object.entries(RZP_PLANS).map(([id, plan]) => ({
-      id,
-      amount: plan.amount,
-      currency: RZP_CURRENCY,
-      label: plan.label,
-      description: plan.description,
-      validityDays: plan.validityDays,
-    })),
+    plans: RZP_VISIBLE_PLAN_IDS.map((id) => {
+      const plan = RZP_PLANS[id];
+      return {
+        id,
+        amount: plan.amount,
+        currency: RZP_CURRENCY,
+        label: plan.label,
+        description: plan.description,
+        subtitle: subtitles[id] || plan.description,
+        validityDays: plan.validityDays,
+        popular: id === RZP_DEFAULT_PLAN,
+      };
+    }),
   });
 });
 
