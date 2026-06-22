@@ -1175,6 +1175,31 @@ app.post("/api/payments/verify", requireAuth, async (req, res) => {
     };
     await storage.saveProfile(user.id.toString(), updated);
 
+    // Record the payment in the ledger so the admin panel can show subscription
+    // history + revenue without re-querying Razorpay. Best-effort — never block
+    // the payment-verify response on a ledger write.
+    try {
+      const purchaseAmountInr = (Number(plan.amount) || 0) / 100;
+      await storage.addPayment?.({
+        userId: user.id.toString(),
+        email: profile?.email || user.email || null,
+        name: profile?.name || user.name || null,
+        role: profile?.role || user.role || "student",
+        plan: planId || RZP_DEFAULT_PLAN,
+        planLabel: plan.label || null,
+        amount: purchaseAmountInr,
+        amountPaise: Number(plan.amount) || 0,
+        currency: RZP_CURRENCY,
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        status: "captured",
+        validUntil: validUntil || null,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn("[payments] ledger write failed:", err?.message || err);
+    }
+
     // Referral commission: if this buyer was referred by a teacher, create a
     // PENDING commission (10%). Best-effort — never block the payment response.
     try {

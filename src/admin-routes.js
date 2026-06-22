@@ -1002,6 +1002,150 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ===== SUBSCRIPTIONS & REVENUE =====
+
+  // List every user who has (or had) a subscription, newest first. Supports a
+  // free-text search via ?q= matching email, name, user id, plan, payment id,
+  // or order id so an admin can paste a buyer's email and jump straight to them.
+  r.get("/subscriptions", requireAdmin, async (req, res) => {
+    try {
+      const q = String(req.query.q || "").trim().toLowerCase();
+      const [profiles, payments] = await Promise.all([
+        storage.getAllProfiles?.() ?? [],
+        storage.getAllPayments?.() ?? [],
+      ]);
+
+      // Latest payment per user for enrichment (payments are already newest-first).
+      const lastPaymentByUser = {};
+      const paymentCountByUser = {};
+      const totalPaidByUser = {};
+      for (const p of payments) {
+        const uid = String(p.userId || "");
+        if (!uid) continue;
+        if (!lastPaymentByUser[uid]) lastPaymentByUser[uid] = p;
+        paymentCountByUser[uid] = (paymentCountByUser[uid] || 0) + 1;
+        totalPaidByUser[uid] = (totalPaidByUser[uid] || 0) + (Number(p.amount) || 0);
+      }
+
+      const now = Date.now();
+      let rows = profiles
+        .filter((p) => p.subscription && (p.subscription.active || p.subscription.plan || p.subscription.razorpayPaymentId))
+        .map((p) => {
+          const uid = String(p.id);
+          const sub = p.subscription || {};
+          const last = lastPaymentByUser[uid] || null;
+          const validUntil = sub.validUntil || last?.validUntil || null;
+          const expired = validUntil ? new Date(validUntil).getTime() < now : false;
+          return {
+            userId: uid,
+            email: p.email || last?.email || null,
+            name: p.name || last?.name || null,
+            role: p.role || last?.role || "student",
+            plan: sub.plan || last?.plan || null,
+            active: Boolean(sub.active) && !expired,
+            expired,
+            validUntil,
+            razorpayPaymentId: sub.razorpayPaymentId || last?.paymentId || null,
+            lastOrderId: last?.orderId || null,
+            lastAmount: last?.amount ?? null,
+            totalPaid: Math.round((totalPaidByUser[uid] || 0) * 100) / 100,
+            paymentCount: paymentCountByUser[uid] || 0,
+            purchasedAt: last?.createdAt || null,
+          };
+        });
+
+      if (q) {
+        rows = rows.filter((row) =>
+          [row.email, row.name, row.userId, row.plan, row.razorpayPaymentId, row.lastOrderId]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q)),
+        );
+      }
+
+      // Newest purchase on top; users without a recorded payment date sink down.
+      rows.sort((a, b) => {
+        const ta = a.purchasedAt ? new Date(a.purchasedAt).getTime() : 0;
+        const tb = b.purchasedAt ? new Date(b.purchasedAt).getTime() : 0;
+        return tb - ta;
+      });
+
+      const activeCount = rows.filter((x) => x.active).length;
+      res.json({
+        subscriptions: rows,
+        summary: {
+          total: rows.length,
+          active: activeCount,
+          expired: rows.length - activeCount,
+        },
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Revenue dashboard: aggregates the payments ledger into totals, by-plan,
+  // by-month, and a recent-transactions feed (newest first).
+  r.get("/revenue", requireAdmin, async (_req, res) => {
+    try {
+      const payments = (await storage.getAllPayments?.()) || [];
+      const captured = payments.filter((p) => (p.status || "captured") === "captured");
+
+      let totalRevenue = 0;
+      const byPlan = {};
+      const byMonth = {};
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      let thisMonthRevenue = 0;
+
+      for (const p of captured) {
+        const amount = Number(p.amount) || 0;
+        totalRevenue += amount;
+        const planKey = p.planLabel || p.plan || "unknown";
+        byPlan[planKey] = byPlan[planKey] || { count: 0, amount: 0 };
+        byPlan[planKey].count += 1;
+        byPlan[planKey].amount += amount;
+        if (p.createdAt) {
+          const d = new Date(p.createdAt);
+          const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          byMonth[mk] = (byMonth[mk] || 0) + amount;
+          if (mk === monthKey) thisMonthRevenue += amount;
+        }
+      }
+
+      const round2 = (n) => Math.round(n * 100) / 100;
+      const recent = captured.slice(0, 25).map((p) => ({
+        id: p.id,
+        email: p.email,
+        name: p.name,
+        plan: p.planLabel || p.plan,
+        amount: round2(Number(p.amount) || 0),
+        currency: p.currency || "INR",
+        paymentId: p.paymentId,
+        orderId: p.orderId,
+        createdAt: p.createdAt,
+      }));
+
+      res.json({
+        currency: payments[0]?.currency || "INR",
+        totalRevenue: round2(totalRevenue),
+        thisMonthRevenue: round2(thisMonthRevenue),
+        totalTransactions: captured.length,
+        averageOrderValue: captured.length ? round2(totalRevenue / captured.length) : 0,
+        byPlan: Object.fromEntries(
+          Object.entries(byPlan).map(([k, v]) => [k, { count: v.count, amount: round2(v.amount) }]),
+        ),
+        byMonth: Object.fromEntries(
+          Object.entries(byMonth)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => [k, round2(v)]),
+        ),
+        recent,
+      });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
   // Multer error handler (file too big, wrong mime)
   r.use((err, _req, res, _next) => {
     if (err) return res.status(400).json({ error: String(err.message || err) });

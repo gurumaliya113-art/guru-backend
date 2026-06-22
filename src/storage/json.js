@@ -27,6 +27,7 @@ const DEFAULT_DB = {
   commissions: [],  // CommissionTransaction[] — { id, referrerId, buyerId, orderId, ... }
   payouts: [],      // Payout[] — { id, userId, amount, transactionNote, paidAt }
   studentRewards: [], // StudentReward[] — { id, userId, coins, premiumDays, reason, createdAt }
+  payments: [],     // Payment[] — { id, userId, email, name, plan, amount, currency, orderId, paymentId, status, createdAt }
 };
 
 function ensureFile() {
@@ -546,5 +547,25 @@ export const jsonStorage = {
     db.tests = [row, ...(db.tests || [])];
     write(db);
     return row;
+  },
+
+  // ----- Payments ledger (subscription purchases) -----
+  // Every verified Razorpay payment is appended here so the admin panel can
+  // surface subscription history and revenue without re-querying Razorpay.
+  async addPayment(payment) {
+    const db = read();
+    const row = {
+      id: payment.id || `pmt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      status: payment.status || "captured",
+      createdAt: payment.createdAt || new Date().toISOString(),
+      ...payment,
+    };
+    db.payments = [row, ...(db.payments || [])];
+    write(db);
+    return row;
+  },
+  async getAllPayments() {
+    const db = read();
+    return db.payments || [];
   },
 };

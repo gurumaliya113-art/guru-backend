@@ -874,4 +874,36 @@ export const supabaseStorage = {
     );
     return data.map(toCamelCase);
   },
+
+  // ===== PAYMENTS (subscription purchases ledger) =====
+  // Requires the `payments` table (see supabase-payments-migration.sql). If the
+  // table is missing we degrade gracefully so a failed insert never blocks the
+  // payment-verify response.
+  async addPayment(p) {
+    try {
+      const dbPayload = toSnakeCase({ id: p.id || `pmt_${crypto.randomBytes(6).toString("hex")}`, ...p });
+      const { data, error } = await supabase
+        .from("payments")
+        .insert([dbPayload])
+        .select()
+        .single();
+      handleError(error);
+      return data ? toCamelCase(data) : null;
+    } catch (e) {
+      console.error("[supabase] addPayment failed (is the payments table created?):", e.message || e);
+      return null;
+    }
+  },
+
+  async getAllPayments() {
+    try {
+      const data = await fetchAllRows("payments", (q) =>
+        q.order("created_at", { ascending: false })
+      );
+      return data.map(toCamelCase);
+    } catch (e) {
+      console.error("[supabase] getAllPayments failed:", e.message || e);
+      return [];
+    }
+  },
 };

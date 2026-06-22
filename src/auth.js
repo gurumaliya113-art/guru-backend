@@ -11,6 +11,18 @@ import crypto from "crypto";
 const TOKENS = new Set(); // active admin tokens
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
 
+// Timing-safe string comparison so login can't be probed via response timing.
+function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a ?? ""), "utf8");
+  const bufB = Buffer.from(String(b ?? ""), "utf8");
+  if (bufA.length !== bufB.length) {
+    // Still run a comparison to keep timing roughly constant.
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 function mintToken() {
   const token = crypto.randomBytes(24).toString("hex");
   TOKENS.add(token);
@@ -22,8 +34,17 @@ export function adminLogin(email, password) {
   const expectedEmail = process.env.ADMIN_EMAIL || "admin@gurutron.local";
   const expectedPassword = process.env.ADMIN_PASSWORD || "changeme";
   if (!email || !password) return null;
-  if (email.trim().toLowerCase() !== expectedEmail.toLowerCase()) return null;
-  if (password !== expectedPassword) return null;
+
+  // In production, refuse to authenticate against the shipped default password.
+  // This prevents an accidental deploy with `changeme` from exposing the panel.
+  if (process.env.NODE_ENV === "production" && expectedPassword === "changeme") {
+    console.error("[admin] Refusing login: ADMIN_PASSWORD is still the default 'changeme'. Set a strong ADMIN_PASSWORD in the environment.");
+    return null;
+  }
+
+  const emailOk = safeEqual(String(email).trim().toLowerCase(), expectedEmail.toLowerCase());
+  const passOk = safeEqual(password, expectedPassword);
+  if (!emailOk || !passOk) return null;
   return mintToken();
 }
 
