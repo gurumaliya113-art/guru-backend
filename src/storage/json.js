@@ -163,6 +163,19 @@ export const jsonStorage = {
     return Object.entries(db.users).map(([id, profile]) => ({ id, ...profile }));
   },
 
+  // Permanently remove a user and all of their associated data.
+  async deleteUser(userId) {
+    const db = read();
+    delete db.users[userId];
+    if (db.accounts) delete db.accounts[userId];
+    if (db.attempts) delete db.attempts[userId];
+    if (db.papers) delete db.papers[userId];
+    db.memberships = (db.memberships || []).filter((m) => String(m.studentId) !== String(userId));
+    db.classes = (db.classes || []).filter((c) => String(c.teacherId) !== String(userId));
+    write(db);
+    return true;
+  },
+
   async findAccountByEmail(email) {
     return findAccountByEmail(email);
   },

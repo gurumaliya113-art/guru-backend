@@ -87,6 +87,11 @@ async function handleGoogleSignIn(req, res) {
       picture: payload.picture,
     });
 
+    // Blocked/suspended accounts cannot sign in.
+    if (profile?.suspended) {
+      return sendAuthError(res, "Your account has been suspended. Please contact support.", 403);
+    }
+
     req.session.user = {
       id: userId,
       email,
@@ -165,6 +170,11 @@ router.post("/login", async (req, res) => {
     }
     if (!userProfile) {
       return sendAuthError(res, "Invalid login ID or password.", 401);
+    }
+
+    // Blocked/suspended accounts cannot sign in.
+    if (userProfile.suspended) {
+      return sendAuthError(res, "Your account has been suspended. Please contact support.", 403);
     }
 
     // Verify password against the stored scrypt hash. If the user has no hash

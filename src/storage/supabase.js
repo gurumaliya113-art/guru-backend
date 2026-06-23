@@ -143,6 +143,16 @@ export const supabaseStorage = {
     return data.map(toCamelCase);
   },
 
+  // Permanently remove a user. Related attempts/papers cascade via FK
+  // (ON DELETE CASCADE in the schema). Memberships/classes are best-effort.
+  async deleteUser(userId) {
+    try { await supabase.from("memberships").delete().eq("student_id", userId); } catch { /* ignore */ }
+    try { await supabase.from("classes").delete().eq("teacher_id", userId); } catch { /* ignore */ }
+    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+    handleError(error);
+    return true;
+  },
+
   async findAccountByEmail(email) {
     const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase

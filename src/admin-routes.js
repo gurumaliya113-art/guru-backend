@@ -1146,6 +1146,56 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ===== USERS MANAGEMENT =====
+
+  // List every registered user (teachers + students) with join date + status.
+  r.get("/users", requireAdmin, async (_req, res) => {
+    try {
+      const profiles = (await storage.getAllProfiles?.()) || [];
+      const users = profiles.map((p) => ({
+        id: String(p.id),
+        name: p.name || null,
+        email: p.email || null,
+        phone: p.phone || p.mobile || null,
+        role: p.role || "student",
+        classLevel: p.classLevel || null,
+        createdAt: p.createdAt || null,
+        suspended: Boolean(p.suspended),
+        subscribed: Boolean(p.subscription?.active),
+        plan: p.subscription?.plan || null,
+      }));
+      // Newest first when createdAt is present.
+      users.sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      res.json({ users });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Suspend / un-suspend a user (blocks login while suspended).
+  r.post("/users/:id/suspend", requireAdmin, async (req, res) => {
+    try {
+      const suspended = Boolean(req.body?.suspended);
+      const profile = await storage.getProfile(req.params.id);
+      if (!profile) return res.status(404).json({ error: "User not found" });
+      const updated = await storage.saveProfile(req.params.id, { ...profile, suspended });
+      res.json({ ok: true, suspended: Boolean(updated?.suspended ?? suspended) });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
+  // Permanently delete a user from the database.
+  r.delete("/users/:id", requireAdmin, async (req, res) => {
+    try {
+      if (!storage.deleteUser) return res.status(501).json({ error: "Delete not supported by storage" });
+      await storage.deleteUser(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  });
+
   // Multer error handler (file too big, wrong mime)
   r.use((err, _req, res, _next) => {
     if (err) return res.status(400).json({ error: String(err.message || err) });
