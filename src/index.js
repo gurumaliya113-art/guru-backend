@@ -1375,15 +1375,28 @@ app.post("/api/ai/chat", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Message is required" });
     }
 
-    const systemPrompt = `You are a helpful AI study assistant for students preparing for competitive exams like NEET and JEE. 
-Your role is to:
-- Explain complex concepts clearly and concisely
-- Answer questions about NEET, JEE, Board, CBSE, and HBSE exam topics
-- Help with physics, chemistry, biology, and mathematics
-- Provide study tips and exam strategies
-- Be encouraging and supportive
+    const systemPrompt = `You are "Guru" — a friendly, energetic and deeply knowledgeable tutor for students preparing for NEET, JEE, BITSAT, CBSE, HBSE and Board exams. You teach Physics, Chemistry, Biology and Mathematics.
 
-Keep responses concise (1-2 paragraphs) unless asked for more detail.`;
+TEACHING STYLE (very important):
+- Teach like an amazing human teacher, NOT like a dry textbook. Be warm, encouraging and engaging.
+- Explain concepts DEEPLY but in simple language. Start from the basics and build up.
+- Use real-life analogies and everyday examples so the student actually "gets it".
+- Break things into clear steps. Use a logical flow: what it is → why it matters → how it works → example → exam tips.
+- Add a touch of fun with relevant emoji (🌱⚛️🔬🧪📐💡), but don't overdo it.
+
+ALWAYS FORMAT YOUR ANSWER IN RICH MARKDOWN:
+- Use "##" headings to organise sections (e.g. "## What is it?", "## How it works", "## Example", "## 📝 Quick Recap").
+- Use **bold** for key terms and important points.
+- Use bullet points and numbered lists for steps.
+- Use markdown tables when comparing things.
+- For any math/formula use clear notation (e.g. \`E = mc²\`, fractions written clearly).
+- End every explanation with a "## 📝 Quick Recap" section (3-5 short bullet points) and a "## 🎯 Exam Tip" line.
+
+DEPTH:
+- Give a genuinely detailed, classroom-quality explanation. Don't be lazy or overly short.
+- If the topic is broad, cover the most exam-relevant parts thoroughly.
+
+Be supportive and motivating. Make the student feel like learning is enjoyable.`;
 
     const messages = [
       ...(conversationHistory || []).map((msg) => ({
@@ -1405,7 +1418,7 @@ Keep responses concise (1-2 paragraphs) unless asked for more detail.`;
         },
         ...messages,
       ],
-      max_tokens: 500,
+      max_tokens: 2000,
       temperature: 0.7,
     });
 
@@ -1415,6 +1428,53 @@ Keep responses concise (1-2 paragraphs) unless asked for more detail.`;
   } catch (e) {
     console.error("[ai/chat] Groq API error:", e);
     res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// --- Free educational images from Wikipedia (no API key needed) ---
+// Given a topic/query, returns real diagram/illustration images from Wikipedia.
+app.post("/api/ai/images", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+
+  try {
+    const query = String((req.body || {}).query || "").trim();
+    if (!query) {
+      return res.status(400).json({ error: "query is required" });
+    }
+
+    // Use MediaWiki API: search top pages and pull their thumbnail images.
+    const url =
+      "https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*" +
+      "&prop=pageimages|pageterms&generator=search&redirects=1" +
+      `&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4` +
+      "&piprop=thumbnail&pithumbsize=640&pilimit=4";
+
+    const wikiResp = await fetch(url, {
+      headers: { "User-Agent": "ExamPrepHub/1.0 (educational tutor app)" },
+    });
+
+    if (!wikiResp.ok) {
+      return res.json({ images: [] });
+    }
+
+    const data = await wikiResp.json();
+    const pages = data?.query?.pages ? Object.values(data.query.pages) : [];
+
+    const images = pages
+      .filter((p) => p?.thumbnail?.source)
+      .sort((a, b) => (a.index || 0) - (b.index || 0))
+      .map((p) => ({
+        title: p.title,
+        url: p.thumbnail.source,
+        description: p?.terms?.description?.[0] || "",
+        source: `https://en.wikipedia.org/wiki/${encodeURIComponent((p.title || "").replace(/ /g, "_"))}`,
+      }));
+
+    res.json({ images });
+  } catch (e) {
+    console.error("[ai/images] Wikipedia fetch error:", e);
+    res.json({ images: [] });
   }
 });
 
