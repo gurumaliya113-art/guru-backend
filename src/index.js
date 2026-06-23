@@ -770,7 +770,108 @@ app.get("/api/classes/:id/memberships", requireAuth, async (req, res) => {
   }
 });
 
-// Teacher: approve/reject a membership
+// Teacher: aggregated stats for a class (per-student summary + class totals).
+// Authorized: only the owning teacher.
+app.get("/api/classes/:id/stats", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  try {
+    const cls = await storage.getClass(req.params.id);
+    if (!cls) return res.status(404).json({ error: "Class not found" });
+    if (cls.teacherId !== user.id.toString()) {
+      return res.status(403).json({ error: "Not your class" });
+    }
+    const memberships = await storage.getMembershipsByClass(cls.id);
+    const approved = memberships.filter((m) => m.status === "approved");
+
+    const round = (n) => Math.round(n);
+    const students = [];
+    let classQuizzes = 0;
+    let classScoreSum = 0; // sum of percentages across all attempts
+    let classAttemptCount = 0;
+
+    for (const m of approved) {
+      const sid = String(m.studentId || "");
+      let attempts = [];
+      try { attempts = sid ? await storage.getAttempts(sid) : []; } catch { attempts = []; }
+      const count = attempts.length;
+      const pcts = attempts.map((a) => (a.totalQuestions ? (a.score / a.totalQuestions) * 100 : 0));
+      const avg = count ? pcts.reduce((s, p) => s + p, 0) / count : 0;
+      const best = count ? Math.max(...pcts) : 0;
+      const lastDate = count ? attempts.map((a) => a.date).filter(Boolean).sort().slice(-1)[0] : null;
+
+      classQuizzes += count;
+      classScoreSum += pcts.reduce((s, p) => s + p, 0);
+      classAttemptCount += count;
+
+      students.push({
+        studentId: sid,
+        membershipId: m.id,
+        name: m.studentName || "Student",
+        rollNumber: m.rollNumber || "",
+        parentPhone: m.parentPhone || "",
+        quizzes: count,
+        avgScore: round(avg),
+        bestScore: round(best),
+        lastActive: lastDate,
+      });
+    }
+
+    // Strongest first by avg score.
+    students.sort((a, b) => b.avgScore - a.avgScore);
+
+    res.json({
+      class: {
+        id: cls.id, name: cls.name, code: cls.code, classLevel: cls.classLevel,
+        batchType: cls.batchType, subject: cls.subject, school: cls.school,
+      },
+      summary: {
+        totalStudents: approved.length,
+        pending: memberships.filter((m) => m.status === "pending").length,
+        totalQuizzes: classQuizzes,
+        classAvgScore: classAttemptCount ? round(classScoreSum / classAttemptCount) : 0,
+      },
+      students,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Teacher: full quiz/mock records of one student in their class.
+// Authorized: owning teacher AND the student must be a member of the class.
+app.get("/api/classes/:id/students/:studentId/attempts", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req, res);
+  if (!user) return;
+  try {
+    const cls = await storage.getClass(req.params.id);
+    if (!cls) return res.status(404).json({ error: "Class not found" });
+    if (cls.teacherId !== user.id.toString()) {
+      return res.status(403).json({ error: "Not your class" });
+    }
+    const sid = String(req.params.studentId || "");
+    const memberships = await storage.getMembershipsByClass(cls.id);
+    const membership = memberships.find((m) => String(m.studentId) === sid);
+    if (!membership) {
+      return res.status(404).json({ error: "Student is not a member of this class" });
+    }
+    let attempts = [];
+    try { attempts = await storage.getAttempts(sid); } catch { attempts = []; }
+    // Newest first.
+    attempts.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    res.json({
+      student: {
+        studentId: sid,
+        name: membership.studentName || "Student",
+        rollNumber: membership.rollNumber || "",
+        parentPhone: membership.parentPhone || "",
+      },
+      attempts,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
 app.patch("/api/memberships/:id", requireAuth, async (req, res) => {
   const user = getCurrentUser(req, res);
   if (!user) return;
