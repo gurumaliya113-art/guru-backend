@@ -1,0 +1,63 @@
+{
+  "examType": "JEE",
+  "classLevel": "12",
+  "board": "CBSE",
+  "subject": "Mathematics",
+  "notes": [
+    {
+      "chapter": "Relations and Functions",
+      "title": "Relations and Functions (Advanced) — Complete JEE Notes",
+      "description": "## Overview\nTypes of relations/functions, composition, invertibility and binary operations.\n\n## 1. Relations\n- Reflexive, symmetric, transitive, **equivalence relations** (partition a set into equivalence classes).\n\n## 2. Functions\n- One-one (injective), onto (surjective), bijective.\n- A function is invertible iff it is bijective; (f⁻¹)⁻¹ = f.\n\n## 3. Composition\n- (gof)(x) = g(f(x)); associative but not commutative.\n- (gof)⁻¹ = f⁻¹og⁻¹.\n\n## 4. Binary Operations\n- Closure, associativity, commutativity, identity element, inverse element.\n\n## ⚠️ Common Traps\n- Invertibility requires bijection (both one-one AND onto).\n- Composition is not commutative (fog ≠ gof in general).\n- Identity for an operation must work for every element.\n\n## 📝 Quick Recap\n- Equivalence relation → classes.\n- Bijective ⇒ invertible.\n- (gof)⁻¹ = f⁻¹og⁻¹.\n\n## 🎯 Exam Tip\nTo prove invertibility, show one-one and onto, then construct the inverse explicitly."
+    },
+    {
+      "chapter": "Inverse Trigonometric Functions",
+      "title": "Inverse Trigonometric Functions — Complete JEE Notes",
+      "description": "## Overview\nDefinitions, principal value branches and identities of inverse trig functions.\n\n## 1. Principal Value Ranges\n- sin⁻¹x ∈ [−π/2, π/2]; cos⁻¹x ∈ [0, π]; tan⁻¹x ∈ (−π/2, π/2).\n\n## 2. Key Identities\n- sin⁻¹x + cos⁻¹x = π/2; tan⁻¹x + cot⁻¹x = π/2; sec⁻¹x + csc⁻¹x = π/2.\n- tan⁻¹x + tan⁻¹y = tan⁻¹((x+y)/(1−xy)) (with conditions on xy).\n- 2tan⁻¹x = tan⁻¹(2x/(1−x²)) = sin⁻¹(2x/(1+x²)).\n\n## 3. Conversions\n- Convert between inverse functions using right-triangle representations.\n\n## ⚠️ Common Traps\n- Always respect the PRINCIPAL value branch (range restrictions).\n- The addition formula for tan⁻¹ needs conditions on xy (add/subtract π).\n- sin⁻¹(sinx) = x only within the principal range.\n\n## 📝 Quick Recap\n- Principal ranges.\n- Complementary identities (sum = π/2).\n- 2tan⁻¹x conversions.\n\n## 🎯 Exam Tip\nWatch the domain conditions in tan⁻¹ addition — a classic JEE trap with ±π adjustments."
+    },
+    {
+      "chapter": "Matrices and Determinants",
+      "title": "Matrices and Determinants — Complete JEE Notes",
+      "description": "## Overview\nMatrix algebra, determinants, inverse and solving linear systems.\n\n## 1. Matrices\n- Types: square, diagonal, identity, symmetric (Aᵀ=A), skew-symmetric (Aᵀ=−A).\n- Matrix multiplication is associative, NOT commutative. (AB)ᵀ = BᵀAᵀ.\n\n## 2. Determinants\n- Properties: row/column swap changes sign; common factor; equal rows ⇒ det = 0.\n- |AB| = |A||B|; |kA| = kⁿ|A| (n×n).\n\n## 3. Inverse of a Matrix\n- A⁻¹ = adj(A)/|A|, exists iff |A| ≠ 0 (non-singular).\n- (AB)⁻¹ = B⁻¹A⁻¹.\n\n## 4. Solving Linear Equations\n- **Cramer's rule:** x = Δ₁/Δ etc. (Δ ≠ 0 → unique solution).\n- Matrix method: X = A⁻¹B.\n- Δ = 0: no solution or infinitely many (consistent/inconsistent).\n\n## ⚠️ Common Traps\n- Matrix multiplication is not commutative.\n- Inverse exists only if determinant ≠ 0.\n- (AB)ᵀ = BᵀAᵀ and (AB)⁻¹ = B⁻¹A⁻¹ (order reverses).\n\n## 📝 Quick Recap\n- Symmetric/skew-symmetric; (AB)ᵀ=BᵀAᵀ.\n- A⁻¹ = adj A/|A|.\n- Cramer's rule & consistency.\n\n## 🎯 Exam Tip\nFor system of equations, check Δ first: Δ≠0 unique; Δ=0 then examine Δ₁,Δ₂,Δ₃ for consistency."
+    },
+    {
+      "chapter": "Continuity and Differentiability",
+      "title": "Continuity and Differentiability — Complete JEE Notes",
+      "description": "## Overview\nContinuity, differentiability and advanced differentiation techniques.\n\n## 1. Continuity\n- f continuous at a: LHL = RHL = f(a).\n- Sum/product/quotient of continuous functions are continuous.\n\n## 2. Differentiability\n- Differentiable ⇒ continuous (converse not true, e.g. |x| at 0).\n\n## 3. Differentiation Techniques\n- Chain rule, product, quotient rules.\n- Implicit differentiation; logarithmic differentiation (for y = f(x)^{g(x)}).\n- Parametric: dy/dx = (dy/dt)/(dx/dt). Second derivative.\n\n## 4. Theorems\n- **Rolle's theorem** and **Lagrange's Mean Value Theorem** (MVT).\n\n## ⚠️ Common Traps\n- Differentiability implies continuity, but not the reverse.\n- Use logarithmic differentiation for variable base AND power.\n- Check conditions before applying Rolle/MVT.\n\n## 📝 Quick Recap\n- Continuity: LHL=RHL=f(a).\n- Implicit, logarithmic, parametric differentiation.\n- Rolle's & MVT.\n\n## 🎯 Exam Tip\nFor functions like xˣ, take log first, then differentiate — standard JEE technique."
+    },
+    {
+      "chapter": "Application of Derivatives",
+      "title": "Application of Derivatives — Complete JEE Notes",
+      "description": "## Overview\nRate of change, tangents/normals, monotonicity and maxima/minima.\n\n## 1. Rate of Change & Tangents\n- dy/dx = slope of tangent. Normal slope = −1/(dy/dx).\n- Related rates problems.\n\n## 2. Monotonicity\n- f'(x) > 0 → increasing; f'(x) < 0 → decreasing on an interval.\n\n## 3. Maxima & Minima\n- Critical points: f'(x) = 0. **First derivative test** (sign change) or **second derivative test** (f''>0 minima, f''<0 maxima).\n- Absolute extrema on [a,b]: compare critical points and endpoints.\n\n## 4. Approximations\n- Δy ≈ (dy/dx)Δx for small changes.\n\n## ⚠️ Common Traps\n- f'(x)=0 gives critical points, not necessarily extrema (check the test).\n- Don't forget endpoints when finding absolute maxima/minima.\n- Second derivative test fails when f''=0 (use first derivative test).\n\n## 📝 Quick Recap\n- Tangent/normal slopes.\n- Increasing/decreasing via f'.\n- Maxima/minima tests.\n\n## 🎯 Exam Tip\nFor optimisation word problems, express the quantity in one variable, then set the derivative to zero."
+    },
+    {
+      "chapter": "Integrals",
+      "title": "Integrals — Complete JEE Notes",
+      "description": "## Overview\nIndefinite & definite integration techniques and properties.\n\n## 1. Indefinite Integrals\n- ∫xⁿdx = xⁿ⁺¹/(n+1) + C (n≠−1); ∫dx/x = ln|x| + C; ∫eˣdx = eˣ + C.\n\n## 2. Methods\n- **Substitution**, **integration by parts** (∫u dv = uv − ∫v du; ILATE order), **partial fractions**, trigonometric substitutions.\n\n## 3. Definite Integrals\n- ∫ₐᵇ f(x)dx = F(b) − F(a). Properties: ∫ₐᵇ f = ∫ₐᵇ f(a+b−x); ∫₀ᵃ f(x) = ∫₀ᵃ f(a−x).\n- Even/odd: ∫₋ₐᵃ f = 2∫₀ᵃ f (even), 0 (odd).\n\n## 4. Definite Integral as Limit of Sum\n- Riemann sum definition.\n\n## ⚠️ Common Traps\n- Choose 'u' by ILATE in integration by parts.\n- Use symmetry/king property to simplify definite integrals.\n- Don't forget the constant C in indefinite integrals.\n\n## 📝 Quick Recap\n- Substitution, by parts (ILATE), partial fractions.\n- King property: ∫ₐᵇf(x)=∫ₐᵇf(a+b−x).\n- Even/odd function integrals.\n\n## 🎯 Exam Tip\nThe 'king property' (a+b−x) cracks many JEE definite-integral problems in one line."
+    },
+    {
+      "chapter": "Application of Integrals",
+      "title": "Application of Integrals — Complete JEE Notes",
+      "description": "## Overview\nArea under curves and between curves using integration.\n\n## 1. Area Under a Curve\n- Area between y = f(x), x-axis, x=a to x=b: ∫ₐᵇ |f(x)| dx.\n\n## 2. Area Between Two Curves\n- ∫ₐᵇ [f(x) − g(x)] dx where f(x) ≥ g(x) on [a,b].\n\n## 3. With Respect to y\n- Sometimes integrating w.r.t. y is easier: ∫ x dy.\n\n## ⚠️ Common Traps\n- Take the modulus where the curve dips below the x-axis (split the integral).\n- Identify which curve is upper/lower before subtracting.\n- Find intersection points to set limits.\n\n## 📝 Quick Recap\n- Area = ∫|f(x)|dx.\n- Between curves: ∫(upper − lower).\n- Split at sign changes / intersections.\n\n## 🎯 Exam Tip\nAlways sketch the region and find intersection points first — prevents sign and limit errors."
+    },
+    {
+      "chapter": "Differential Equations",
+      "title": "Differential Equations — Complete JEE Notes",
+      "description": "## Overview\nOrder, degree and methods of solving differential equations.\n\n## 1. Basics\n- **Order** = highest derivative; **degree** = power of highest derivative (after removing radicals).\n\n## 2. Methods\n- **Variable separable:** f(y)dy = g(x)dx.\n- **Homogeneous:** put y = vx.\n- **Linear DE:** dy/dx + Py = Q; integrating factor IF = e^{∫P dx}; solution y·IF = ∫Q·IF dx.\n\n## 3. Formation\n- Form a DE by eliminating arbitrary constants (number of constants = order).\n\n## ⚠️ Common Traps\n- Degree is defined only when the equation is a polynomial in derivatives.\n- For linear DE, multiply through by the integrating factor.\n- Don't forget the constant of integration.\n\n## 📝 Quick Recap\n- Order & degree.\n- Separable, homogeneous, linear (IF method).\n- Eliminate constants to form DE.\n\n## 🎯 Exam Tip\nIdentify the DE type first (separable / homogeneous / linear) — that picks the method instantly."
+    },
+    {
+      "chapter": "Vector Algebra",
+      "title": "Vector Algebra — Complete JEE Notes",
+      "description": "## Overview\nVectors, dot and cross products and their applications.\n\n## 1. Basics\n- |a| = √(a₁²+a₂²+a₃²). Unit vector â = a/|a|.\n- Position vectors; section formula.\n\n## 2. Dot Product (scalar)\n- a·b = |a||b|cosθ = a₁b₁+a₂b₂+a₃b₃. Perpendicular ⇒ a·b = 0.\n- Projection of a on b = (a·b)/|b|.\n\n## 3. Cross Product (vector)\n- a×b = |a||b|sinθ n̂; |a×b| = area of parallelogram. Parallel ⇒ a×b = 0.\n\n## 4. Triple Products\n- Scalar triple product [a b c] = a·(b×c) = volume of parallelepiped; = 0 if coplanar.\n\n## ⚠️ Common Traps\n- Dot product is scalar; cross product is a vector.\n- a·b = 0 ⇒ perpendicular; a×b = 0 ⇒ parallel.\n- Scalar triple product = 0 means vectors are coplanar.\n\n## 📝 Quick Recap\n- Dot (cosθ), cross (sinθ).\n- Projection formula.\n- [a b c] = volume; 0 ⇒ coplanar.\n\n## 🎯 Exam Tip\nUse the scalar triple product to test coplanarity and compute volumes in one step."
+    },
+    {
+      "chapter": "Three Dimensional Geometry",
+      "title": "Three Dimensional Geometry — Complete JEE Notes",
+      "description": "## Overview\nLines and planes in 3D space.\n\n## 1. Direction Cosines & Ratios\n- l² + m² + n² = 1. Direction ratios proportional to direction cosines.\n\n## 2. Line\n- Vector form: r = a + λb. Cartesian: (x−x₁)/a = (y−y₁)/b = (z−z₁)/c.\n- Angle between lines via direction ratios: cosθ = |b₁·b₂|/(|b₁||b₂|).\n\n## 3. Plane\n- Normal form: r·n̂ = d. Cartesian: ax+by+cz+d = 0 (normal (a,b,c)).\n- Distance of a point from a plane: |ax₁+by₁+cz₁+d|/√(a²+b²+c²).\n\n## 4. Line & Plane Relations\n- Angle between line and plane; condition for line lying in a plane.\n\n## ⚠️ Common Traps\n- For a line and plane, sinθ uses the normal (not cosθ).\n- Coefficients (a,b,c) of plane give the normal vector.\n- Use direction ratios consistently.\n\n## 📝 Quick Recap\n- l²+m²+n²=1.\n- Line & plane equations.\n- Point-to-plane distance.\n\n## 🎯 Exam Tip\nRemember: angle between line and plane uses the normal (sinθ), between two planes uses the normals (cosθ)."
+    },
+    {
+      "chapter": "Probability (Advanced)",
+      "title": "Probability (Bayes & Distributions) — Complete JEE Notes",
+      "description": "## Overview\nConditional probability, Bayes' theorem and probability distributions.\n\n## 1. Conditional Probability\n- P(A|B) = P(A∩B)/P(B). Multiplication: P(A∩B) = P(A)P(B|A).\n- Independent events: P(A∩B) = P(A)P(B).\n\n## 2. Total Probability & Bayes\n- Total probability: P(A) = Σ P(Eᵢ)P(A|Eᵢ).\n- **Bayes:** P(Eᵢ|A) = P(Eᵢ)P(A|Eᵢ)/ΣP(Eⱼ)P(A|Eⱼ).\n\n## 3. Random Variables\n- Probability distribution; **mean (expectation)** E(X) = Σxᵢpᵢ; variance = Σxᵢ²pᵢ − [E(X)]².\n\n## 4. Binomial Distribution\n- P(X=r) = ⁿCᵣ pʳ q^{n−r}; mean = np, variance = npq.\n\n## ⚠️ Common Traps\n- Mutually exclusive ≠ independent.\n- Bayes' theorem for posterior (reverse conditional) probability.\n- Binomial mean np, variance npq (variance < mean).\n\n## 📝 Quick Recap\n- Conditional & total probability.\n- Bayes' theorem.\n- Binomial: mean np, variance npq.\n\n## 🎯 Exam Tip\nFor 'given that... find probability of cause' problems, use Bayes' theorem directly."
+    }
+  ]
+}
