@@ -130,7 +130,19 @@ function getCurrentUser(req, res) {
 }
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, storage: process.env.STORAGE || "json" });
+  res.json({
+    ok: true,
+    storage: process.env.STORAGE || "json",
+    // Boolean presence flags only (never the secret values) so we can verify
+    // which keys the RUNNING backend actually sees in its environment.
+    env: {
+      geminiKey: !!process.env.GEMINI_API_KEY,
+      geminiKey2: !!process.env.GEMINI_API_KEY_2,
+      groqKey: !!(process.env.GROQ_API_KEY || process.env.GROQ_API_KEY_CHAT),
+      razorpay: !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+      nodeEnv: process.env.NODE_ENV || "(unset)",
+    },
+  });
 });
 
 // --- Learning routes: notes, tests, rankings, chat ---
