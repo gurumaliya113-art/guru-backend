@@ -1,0 +1,78 @@
+{
+  "examType": "NEET",
+  "classLevel": "11",
+  "board": "CBSE",
+  "subject": "Physics",
+  "notes": [
+    {
+      "chapter": "Units and Measurements",
+      "title": "Units and Measurements — Key Concepts",
+      "description": "## Overview\nMeasurement is the foundation of physics. Every physical quantity has a **magnitude** and a **unit**.\n\n## Key Concepts\n- **Fundamental (base) quantities:** length (m), mass (kg), time (s), electric current (A), temperature (K), amount of substance (mol), luminous intensity (cd).\n- **Derived units:** formed from base units (e.g. speed = m/s, force = kg·m/s² = N).\n- **Dimensional formula:** expresses a quantity in terms of [M], [L], [T]. Example: Force = [M¹L¹T⁻²].\n- **Dimensional analysis** is used to: check correctness of equations, derive relations, and convert units.\n- **Significant figures:** reflect the precision of a measurement. Rules govern rounding in calculations.\n- **Errors:** absolute error, relative error, and percentage error. Errors add up in sums/differences; relative errors add in products/quotients.\n\n## Key Formulas\n- Percentage error = (Δa / a) × 100\n- For Z = (A^p)(B^q), relative error = p(ΔA/A) + q(ΔB/B)\n\n## 🎯 Exam Tip\nUse dimensional analysis to instantly reject wrong options in MCQs — if dimensions don't match, the formula is wrong."
+    },
+    {
+      "chapter": "Motion in a Straight Line",
+      "title": "Motion in a Straight Line — Key Concepts",
+      "description": "## Overview\nStudy of motion along a straight line (1-D kinematics) without worrying about its cause.\n\n## Key Concepts\n- **Distance vs Displacement:** distance is scalar (total path), displacement is vector (shortest, with direction).\n- **Speed vs Velocity:** speed is scalar, velocity is vector. Average velocity = displacement/time.\n- **Acceleration:** rate of change of velocity. Uniform acceleration → constant a.\n- **Graphs:** slope of x-t graph = velocity; slope of v-t graph = acceleration; area under v-t graph = displacement.\n\n## Key Formulas (uniform acceleration)\n- `v = u + at`\n- `s = ut + ½at²`\n- `v² = u² + 2as`\n- `sₙ = u + a(n − ½)` (distance in nth second)\n\n## 🎯 Exam Tip\nFor a body thrown up, take g = −9.8 m/s² and remember velocity = 0 at the highest point."
+    },
+    {
+      "chapter": "Motion in a Plane",
+      "title": "Motion in a Plane — Key Concepts",
+      "description": "## Overview\nMotion in two dimensions using vectors — includes projectile and circular motion.\n\n## Key Concepts\n- **Vectors:** quantities with magnitude and direction; add by triangle/parallelogram law.\n- **Resolution:** any vector splits into components: `Aₓ = A cosθ`, `A_y = A sinθ`.\n- **Projectile motion:** horizontal and vertical motions are independent. Horizontal: constant velocity; Vertical: uniform acceleration g.\n- **Uniform circular motion:** speed constant but velocity changes → centripetal acceleration directed to centre.\n\n## Key Formulas\n- Time of flight: `T = 2u sinθ / g`\n- Max height: `H = u²sin²θ / 2g`\n- Range: `R = u²sin2θ / g` (max at θ = 45°)\n- Centripetal acceleration: `a = v²/r = ω²r`\n\n## 🎯 Exam Tip\nRange is the same for complementary angles (e.g. 30° and 60°)."
+    },
+    {
+      "chapter": "Laws of Motion",
+      "title": "Laws of Motion — Key Concepts",
+      "description": "## Overview\nNewton's three laws connect force and motion — the heart of mechanics.\n\n## Key Concepts\n- **First law (inertia):** a body stays at rest or in uniform motion unless acted on by a net external force.\n- **Second law:** `F = ma`; force = rate of change of momentum `F = dp/dt`.\n- **Third law:** every action has an equal and opposite reaction.\n- **Momentum:** `p = mv`; conserved when net external force is zero.\n- **Friction:** static (`f ≤ μₛN`) and kinetic (`f = μₖN`). Static friction is self-adjusting.\n- **Banking of roads** and **circular motion** dynamics.\n\n## Key Formulas\n- `F = ma`, Impulse `J = FΔt = Δp`\n- Conservation of momentum: `m₁u₁ + m₂u₂ = m₁v₁ + m₂v₂`\n\n## 🎯 Exam Tip\nAlways draw a free-body diagram (FBD) first — it makes force problems straightforward."
+    },
+    {
+      "chapter": "Work, Energy and Power",
+      "title": "Work, Energy and Power — Key Concepts",
+      "description": "## Overview\nRelates force, displacement, and energy — including conservation principles.\n\n## Key Concepts\n- **Work:** `W = F·s = Fs cosθ`. Positive, negative, or zero depending on angle.\n- **Kinetic energy:** `KE = ½mv²`. **Work-energy theorem:** net work = change in KE.\n- **Potential energy:** gravitational `PE = mgh`; spring `PE = ½kx²`.\n- **Conservation of mechanical energy:** total energy constant when only conservative forces act.\n- **Power:** rate of doing work, `P = W/t = F·v`.\n- **Collisions:** elastic (KE conserved) vs inelastic (KE not conserved, momentum always conserved).\n\n## Key Formulas\n- `W = Fs cosθ`, `KE = ½mv²`, `P = Fv`\n- Coefficient of restitution: `e = (v₂−v₁)/(u₁−u₂)`\n\n## 🎯 Exam Tip\nIn a perfectly elastic collision of equal masses, the velocities are simply exchanged."
+    },
+    {
+      "chapter": "System of Particles and Rotational Motion",
+      "title": "System of Particles and Rotational Motion — Key Concepts",
+      "description": "## Overview\nExtends mechanics from point particles to rigid bodies that rotate.\n\n## Key Concepts\n- **Centre of mass (COM):** point where total mass can be assumed concentrated.\n- **Torque:** `τ = r × F`; rotational analogue of force.\n- **Moment of inertia (I):** resistance to rotational change; depends on mass distribution.\n- **Angular momentum:** `L = Iω`; conserved when net external torque is zero.\n- **Rolling motion:** combination of translation and rotation.\n\n## Key Formulas\n- `τ = Iα`, `L = Iω`\n- Rotational KE = `½Iω²`\n- Parallel axis theorem: `I = I_cm + Md²`\n\n## 🎯 Exam Tip\nFor conservation of angular momentum (e.g. a spinning skater pulling arms in), `I₁ω₁ = I₂ω₂`."
+    },
+    {
+      "chapter": "Gravitation",
+      "title": "Gravitation — Key Concepts",
+      "description": "## Overview\nNewton's universal law of gravitation and planetary/satellite motion.\n\n## Key Concepts\n- **Universal law:** `F = Gm₁m₂/r²`.\n- **Acceleration due to gravity g** varies with altitude, depth, and latitude.\n- **Gravitational potential energy:** `U = −Gm₁m₂/r`.\n- **Escape velocity** and **orbital velocity** of satellites.\n- **Kepler's laws** of planetary motion (orbit, areal velocity, period).\n\n## Key Formulas\n- `g = GM/R²`\n- Escape velocity: `vₑ = √(2GM/R) = √(2gR)`\n- Orbital velocity: `v₀ = √(GM/r)`\n- Kepler's third law: `T² ∝ r³`\n\n## 🎯 Exam Tip\nEscape velocity = √2 × orbital velocity (at the surface). Remember vₑ ≈ 11.2 km/s for Earth."
+    },
+    {
+      "chapter": "Mechanical Properties of Solids",
+      "title": "Mechanical Properties of Solids — Key Concepts",
+      "description": "## Overview\nHow solids deform under applied forces — elasticity.\n\n## Key Concepts\n- **Stress:** internal restoring force per unit area. **Strain:** fractional deformation.\n- **Hooke's law:** within the elastic limit, stress ∝ strain.\n- **Moduli of elasticity:** Young's modulus (Y, length), Bulk modulus (K, volume), Shear/Rigidity modulus (η, shape).\n- **Poisson's ratio:** lateral strain / longitudinal strain.\n- **Elastic potential energy** stored in a stretched wire.\n\n## Key Formulas\n- `Y = stress/strain = (F·L)/(A·ΔL)`\n- Elastic PE per unit volume = `½ × stress × strain`\n\n## 🎯 Exam Tip\nSteel has a higher Young's modulus than rubber, so steel is more elastic (resists deformation more)."
+    },
+    {
+      "chapter": "Mechanical Properties of Fluids",
+      "title": "Mechanical Properties of Fluids — Key Concepts",
+      "description": "## Overview\nBehaviour of liquids and gases at rest and in motion.\n\n## Key Concepts\n- **Pressure:** `P = F/A`; increases with depth: `P = P₀ + ρgh`.\n- **Pascal's law:** pressure applied to an enclosed fluid is transmitted equally (hydraulic lift).\n- **Buoyancy / Archimedes' principle:** upthrust = weight of displaced fluid.\n- **Viscosity:** internal friction in fluids; Stokes' law for spheres.\n- **Surface tension:** energy per unit area; capillary rise.\n- **Bernoulli's theorem:** energy conservation in flowing fluids.\n\n## Key Formulas\n- `P = P₀ + ρgh`\n- Bernoulli: `P + ½ρv² + ρgh = constant`\n- Terminal velocity: `v = 2r²(ρ−σ)g / 9η`\n\n## 🎯 Exam Tip\nBernoulli explains lift on aeroplane wings: faster air on top → lower pressure → upward lift."
+    },
+    {
+      "chapter": "Thermal Properties of Matter",
+      "title": "Thermal Properties of Matter — Key Concepts",
+      "description": "## Overview\nHeat, temperature, expansion, and heat transfer.\n\n## Key Concepts\n- **Temperature scales:** Celsius, Fahrenheit, Kelvin.\n- **Thermal expansion:** linear (α), area (β = 2α), volume (γ = 3α).\n- **Specific heat capacity** and **latent heat** (fusion, vaporisation).\n- **Calorimetry:** heat lost = heat gained.\n- **Heat transfer:** conduction, convection, radiation.\n- **Newton's law of cooling** and **Stefan-Boltzmann law**.\n\n## Key Formulas\n- `Q = mcΔT`, `Q = mL`\n- `ΔL = LαΔT`\n- Stefan's law: `E = σT⁴`\n\n## 🎯 Exam Tip\nFor linear, area, and volume expansion remember the ratio α : β : γ = 1 : 2 : 3."
+    },
+    {
+      "chapter": "Thermodynamics",
+      "title": "Thermodynamics — Key Concepts",
+      "description": "## Overview\nStudy of heat, work, and energy transfer in systems.\n\n## Key Concepts\n- **Zeroth law:** defines temperature (thermal equilibrium).\n- **First law:** `ΔQ = ΔU + ΔW` (energy conservation).\n- **Thermodynamic processes:** isothermal, adiabatic, isobaric, isochoric.\n- **Second law:** heat cannot flow spontaneously from cold to hot; introduces entropy.\n- **Heat engines, refrigerators, and Carnot cycle** (max efficiency).\n\n## Key Formulas\n- First law: `ΔQ = ΔU + ΔW`\n- Work in isothermal: `W = nRT ln(V₂/V₁)`\n- Carnot efficiency: `η = 1 − T_c/T_h`\n\n## 🎯 Exam Tip\nIn an adiabatic process ΔQ = 0, so all work is done at the expense of internal energy."
+    },
+    {
+      "chapter": "Kinetic Theory",
+      "title": "Kinetic Theory of Gases — Key Concepts",
+      "description": "## Overview\nExplains gas behaviour using the motion of molecules.\n\n## Key Concepts\n- **Ideal gas equation:** `PV = nRT`.\n- **Pressure of a gas** from molecular motion: `P = ⅓ρ⟨v²⟩`.\n- **Kinetic interpretation of temperature:** average KE ∝ absolute temperature.\n- **Degrees of freedom** and **law of equipartition of energy**.\n- **Mean free path** of molecules.\n\n## Key Formulas\n- `PV = nRT`\n- Average KE per molecule = `(3/2)k_BT`\n- RMS speed: `v_rms = √(3RT/M)`\n\n## 🎯 Exam Tip\nv_rms ∝ √T and ∝ 1/√M — heavier molecules move slower at the same temperature."
+    },
+    {
+      "chapter": "Oscillations",
+      "title": "Oscillations (SHM) — Key Concepts",
+      "description": "## Overview\nPeriodic to-and-fro motion, especially Simple Harmonic Motion (SHM).\n\n## Key Concepts\n- **SHM:** restoring force ∝ displacement and directed toward mean position (`F = −kx`).\n- **Displacement:** `x = A sin(ωt + φ)`.\n- **Energy in SHM:** continuously interchanges between KE and PE; total energy constant.\n- **Simple pendulum** and **spring-mass system**.\n- **Damped, forced, and resonance** oscillations.\n\n## Key Formulas\n- `T = 2π√(m/k)` (spring), `T = 2π√(L/g)` (pendulum)\n- Total energy = `½kA² = ½mω²A²`\n- `v = ω√(A² − x²)`\n\n## 🎯 Exam Tip\nVelocity is maximum at the mean position; acceleration is maximum at the extreme positions."
+    },
+    {
+      "chapter": "Waves",
+      "title": "Waves — Key Concepts",
+      "description": "## Overview\nPropagation of disturbances that transfer energy without transferring matter.\n\n## Key Concepts\n- **Transverse vs longitudinal** waves.\n- **Wave equation:** `y = A sin(ωt − kx)`; relation `v = fλ`.\n- **Speed of waves** on a string and sound in media.\n- **Superposition:** interference, beats, and standing waves.\n- **Resonance** in strings and air columns; **Doppler effect**.\n\n## Key Formulas\n- `v = fλ`, `v = √(T/μ)` (string)\n- Beat frequency = `|f₁ − f₂|`\n- Doppler: `f' = f(v ± v₀)/(v ∓ v_s)`\n\n## 🎯 Exam Tip\nBeats are heard only when the frequency difference is small (≤ ~10 Hz) — useful for tuning instruments."
+    }
+  ]
+}
