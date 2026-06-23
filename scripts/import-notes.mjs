@@ -40,16 +40,7 @@ const storage = useSupabase ? supabaseStorage : jsonStorage;
 console.log(`[notes] storage = ${useSupabase ? "supabase" : "json"}${DRY ? " (DRY RUN)" : ""}`);
 
 const DATA_DIR = path.join(__dirname, "notes-data");
-const IMPORTED_FILE = path.join(__dirname, ".notes-imported.json");
 const newId = () => "note_" + crypto.randomBytes(6).toString("hex");
-
-function loadImported() {
-  try { return new Set(JSON.parse(fs.readFileSync(IMPORTED_FILE, "utf-8"))); }
-  catch { return new Set(); }
-}
-function saveImported(set) {
-  fs.writeFileSync(IMPORTED_FILE, JSON.stringify([...set], null, 2));
-}
 
 function normalize(n, meta) {
   const now = new Date().toISOString();
@@ -76,11 +67,9 @@ async function main() {
   const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".json")).sort();
   if (files.length === 0) { console.log("[notes] no .json files found in scripts/notes-data/"); process.exit(0); }
 
-  const imported = loadImported();
-  let grand = 0, inserted = 0;
+  let grand = 0, inserted = 0, removed = 0;
 
   for (const file of files) {
-    if (imported.has(file)) { console.log(`= skip (already imported): ${file}`); continue; }
     const full = path.join(DATA_DIR, file);
     let doc;
     try { doc = JSON.parse(fs.readFileSync(full, "utf-8")); }
@@ -97,27 +86,31 @@ async function main() {
     grand += rows.length;
     console.log(`> ${file}: ${meta.examType} · Class ${meta.classLevel} · ${meta.subject} · ${rows.length} notes`);
 
-    if (rows.length && !DRY) {
-      let ok = 0;
-      for (const row of rows) {
-        try {
-          await storage.addNote(row);
-          ok += 1;
-        } catch (e) {
-          console.warn(`  insert failed (${row.chapter}): ${(e?.message || e).toString().slice(0, 140)}`);
-        }
+    if (!rows.length || DRY) continue;
+
+    // Replace semantics: remove existing curated notes for this exam/class/subject
+    // so re-running the importer syncs the DB to the JSON (no duplicates).
+    try {
+      const existing = await storage.getNotes({ examType: meta.examType, classLevel: meta.classLevel });
+      const stale = (existing || []).filter(
+        (e) => e.subject === meta.subject && (e.uploadedBy === "curated")
+      );
+      for (const s of stale) {
+        try { await storage.deleteNote?.(s.id); removed += 1; } catch { /* ignore */ }
       }
-      inserted += ok;
-      if (ok === rows.length) {
-        imported.add(file);
-        saveImported(imported);
-      } else {
-        console.warn(`  partial import for ${file} (${ok}/${rows.length}) — not marking as done so you can re-run.`);
-      }
+    } catch (e) {
+      console.warn(`  could not clear existing notes: ${(e?.message || e).toString().slice(0, 120)}`);
     }
+
+    let ok = 0;
+    for (const row of rows) {
+      try { await storage.addNote(row); ok += 1; }
+      catch (e) { console.warn(`  insert failed (${row.chapter}): ${(e?.message || e).toString().slice(0, 140)}`); }
+    }
+    inserted += ok;
   }
 
-  console.log(`\n[notes] files=${files.length} generated=${grand} inserted=${inserted}${DRY ? " (dry)" : ""}`);
+  console.log(`\n[notes] files=${files.length} generated=${grand} removed=${removed} inserted=${inserted}${DRY ? " (dry)" : ""}`);
   process.exit(0);
 }
 
