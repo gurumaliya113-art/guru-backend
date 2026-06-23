@@ -1093,6 +1093,7 @@ export function buildAdminRouter(storage) {
       let totalRevenue = 0;
       const byPlan = {};
       const byMonth = {};
+      const byRole = { teacher: { count: 0, amount: 0 }, student: { count: 0, amount: 0 } };
       const now = new Date();
       const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       let thisMonthRevenue = 0;
@@ -1104,6 +1105,9 @@ export function buildAdminRouter(storage) {
         byPlan[planKey] = byPlan[planKey] || { count: 0, amount: 0 };
         byPlan[planKey].count += 1;
         byPlan[planKey].amount += amount;
+        const roleKey = p.role === "teacher" ? "teacher" : "student";
+        byRole[roleKey].count += 1;
+        byRole[roleKey].amount += amount;
         if (p.createdAt) {
           const d = new Date(p.createdAt);
           const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -1134,6 +1138,10 @@ export function buildAdminRouter(storage) {
         byPlan: Object.fromEntries(
           Object.entries(byPlan).map(([k, v]) => [k, { count: v.count, amount: round2(v.amount) }]),
         ),
+        byRole: {
+          teacher: { count: byRole.teacher.count, amount: round2(byRole.teacher.amount) },
+          student: { count: byRole.student.count, amount: round2(byRole.student.amount) },
+        },
         byMonth: Object.fromEntries(
           Object.entries(byMonth)
             .sort(([a], [b]) => a.localeCompare(b))
