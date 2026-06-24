@@ -2,3 +2,11 @@ node_modules
 .env
 .DS_Store
 npm-debug.log
+
+# Local PYP source PDFs (large, not for repo)
+scripts/pyp-pdfs/*.pdf
+scripts/pyp-pdfs/*.meta.json
+
+# PYP importer local state (machine-specific, not for repo)
+scripts/.pyp-pdf-cache/
+scripts/.pyp-pdf-imported.json

@@ -200,11 +200,26 @@ export const supabaseStorage = {
 
   async addAttempt(userId, attempt) {
     const dbPayload = toSnakeCase({ id: attempt.id || crypto.randomUUID(), user_id: userId, ...attempt });
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("attempts")
       .insert([dbPayload])
       .select()
       .single();
+
+    // Legacy DBs may still carry a stray foreign-key constraint on quiz_id
+    // (attempts_quiz_id_fkey). Mock/PYP/generated-paper quiz ids don't exist
+    // in the referenced table, so the insert fails and the student's progress
+    // is lost. quiz_id is only a label — drop it and retry so progress saves.
+    // (Run supabase-attempts-fix.sql to remove the constraint permanently.)
+    if (error && /quiz_id/i.test(error.message || "")) {
+      const { quiz_id, ...withoutQuizId } = dbPayload;
+      ({ data, error } = await supabase
+        .from("attempts")
+        .insert([withoutQuizId])
+        .select()
+        .single());
+    }
+
     handleError(error);
     return data ? toCamelCase(data) : null;
   },
