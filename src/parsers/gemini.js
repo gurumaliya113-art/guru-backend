@@ -35,7 +35,14 @@ Return ONLY valid JSON of the shape: { "questions": [...] }
 No prose, no markdown fences.`;
 
 export function isGeminiAvailable() {
-  return !!process.env.GEMINI_API_KEY;
+  // Match the keys the parser actually uses (getGeminiApiKeys): primary,
+  // secondary, and the comma-separated list. Checking only GEMINI_API_KEY made
+  // the admin UI show "no key" even when a usable key was set in _2 / _KEYS.
+  return !!(
+    process.env.GEMINI_API_KEY ||
+    process.env.GEMINI_API_KEY_2 ||
+    process.env.GEMINI_API_KEYS
+  );
 }
 
 function buildModel({ modelName, systemInstruction, responseMimeType, apiKey }) {
@@ -145,8 +152,8 @@ export async function parseWithGemini(rawText, options = {}) {
   const geminiModel = options.modelName || DEFAULT_MODEL;
   const source = options.source || "pdf-ai";
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not set in server/.env");
+  if (!isGeminiAvailable()) {
+    throw new Error("No Gemini API key set (GEMINI_API_KEY / GEMINI_API_KEY_2) on the server.");
   }
 
   // Cap input size: 30k chars is safe for free tier
@@ -235,8 +242,8 @@ For each question return:
 Preserve math notation exactly. Return ONLY valid JSON with shape { "questions": [...] }.`;
 
 export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, pageNumber, source = "dpp-ai" }) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not set in server/.env");
+  if (!isGeminiAvailable()) {
+    throw new Error("No Gemini API key set (GEMINI_API_KEY / GEMINI_API_KEY_2) on the server.");
   }
 
   const geminiModel = modelName || DEFAULT_DPP_MODEL;
@@ -274,8 +281,8 @@ If the user asks for a hint, provide a brief hint instead of the full solution.
 Keep answers focused and exam-oriented.`;
 
 export async function answerWithGemini({ message, conversationHistory = [], modelName, systemInstruction = ANSWER_SYSTEM_PROMPT }) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY not set in server/.env");
+  if (!isGeminiAvailable()) {
+    throw new Error("No Gemini API key set (GEMINI_API_KEY / GEMINI_API_KEY_2) on the server.");
   }
 
   const geminiModel = modelName || DEFAULT_DPP_MODEL;
