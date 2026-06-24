@@ -616,7 +616,7 @@ export function buildAdminRouter(storage) {
         await tryGroq();
       } else if (requestedMode === "gemini" || requestedMode === "ai") {
         if (!isGeminiAvailable()) {
-          return res.status(400).json({ error: "Gemini mode requested but GEMINI_API_KEY is not set." });
+          return res.status(400).json({ error: "Gemini mode requested but GEMINI_API_KEY is not set on the server." });
         }
         await tryGemini();
       } else if (requestedMode === "heuristic") {
