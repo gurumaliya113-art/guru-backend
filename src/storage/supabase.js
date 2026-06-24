@@ -199,29 +199,38 @@ export const supabaseStorage = {
   },
 
   async addAttempt(userId, attempt) {
-    const dbPayload = toSnakeCase({ id: attempt.id || crypto.randomUUID(), user_id: userId, ...attempt });
-    let { data, error } = await supabase
-      .from("attempts")
-      .insert([dbPayload])
-      .select()
-      .single();
+    let payload = toSnakeCase({ id: attempt.id || crypto.randomUUID(), user_id: userId, ...attempt });
 
-    // Legacy DBs may still carry a stray foreign-key constraint on quiz_id
-    // (attempts_quiz_id_fkey). Mock/PYP/generated-paper quiz ids don't exist
-    // in the referenced table, so the insert fails and the student's progress
-    // is lost. quiz_id is only a label — drop it and retry so progress saves.
-    // (Run supabase-attempts-fix.sql to remove the constraint permanently.)
-    if (error && /quiz_id/i.test(error.message || "")) {
-      const { quiz_id, ...withoutQuizId } = dbPayload;
-      ({ data, error } = await supabase
+    // Resilient insert: legacy DBs may carry a stray quiz_id FK, and newer
+    // optional fields (marks, max_marks) may not exist as columns yet. In both
+    // cases Postgres/PostgREST names the offending column in the error — strip
+    // it and retry so the student's progress is never silently dropped.
+    // (Run supabase-attempts-fix.sql / supabase-attempts-marks.sql to keep them.)
+    for (let i = 0; i < 4; i++) {
+      const { data, error } = await supabase
         .from("attempts")
-        .insert([withoutQuizId])
+        .insert([payload])
         .select()
-        .single());
-    }
+        .single();
+      if (!error) return data ? toCamelCase(data) : null;
 
-    handleError(error);
-    return data ? toCamelCase(data) : null;
+      const msg = error.message || "";
+      // Find a column name mentioned in the error and drop it (unknown column),
+      // or drop quiz_id when a legacy foreign-key constraint rejects the insert.
+      const m = msg.match(/'([a-z_]+)' column/i) || msg.match(/column "?([a-z_]+)"?/i);
+      let col = m && m[1];
+      if ((!col || !(col in payload)) && /quiz_id/i.test(msg) && "quiz_id" in payload) {
+        col = "quiz_id";
+      }
+      if (col && col in payload) {
+        const { [col]: _drop, ...rest } = payload;
+        payload = rest;
+        continue;
+      }
+      // Unknown error we can't recover from.
+      handleError(error);
+    }
+    return null;
   },
 
   // ===== PAPERS (Generated Question Papers) =====
