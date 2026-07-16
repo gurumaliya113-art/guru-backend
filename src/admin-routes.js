@@ -10,13 +10,16 @@ import { extractPdfPages } from "./parsers/pdf-extract.js";
 import { extractRawPdfPages } from "./parsers/pdf-raw.js";
 import { extractDocxPages } from "./parsers/docx-extract.js";
 import { renderPagesToPng } from "./parsers/pdf-render.js";
+import { applySolutionSheet } from "./parsers/solution-match.js";
 import {
   saveDocumentBytes,
   getPdfBytes,
   savePageImage,
+  saveFigureImage,
   newDocumentId,
 } from "./storage/pdf-storage.js";
 import { summarizeCommissions, cancelCommissionForOrder } from "./referral.js";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 const upload = multer({
   storage: multer.memoryStorage(), // we never persist the PDF — only its extracted text
@@ -42,6 +45,70 @@ const upload = multer({
     }
   },
 });
+
+// ---- Tuning knobs for the heavy "AI Pro Max" (dpp / vision) path ----
+// These keep a single /parse-pdf request within the hosting platform's request
+// timeout and memory budget so it returns a real result instead of a 502
+// (gateway timeout / OOM crash of the container).
+//
+// PDF_RENDER_SCALE: render resolution. Pixmap memory grows with scale², so
+//   1.35 uses ~44% less RAM than 1.8 while staying legible for AI vision.
+// GEMINI_CALL_TIMEOUT_MS: max time to wait on a single Gemini call before we
+//   give up and fall back to a fast parser.
+// MAX_FIGURE_PAGES: cap on how many figure snapshots we render per upload.
+const PDF_RENDER_SCALE = Number(process.env.PDF_RENDER_SCALE || 1.35);
+// Generous per-call budget: a single vision call may internally retry 503s
+// with backoff, so give it room before we abandon the page.
+const GEMINI_CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 120000);
+const MAX_FIGURE_PAGES = Number(process.env.MAX_FIGURE_PAGES || 6);
+// Scanned / image-only PDFs are read page-by-page with Gemini vision. We render
+// at a higher scale than figure snapshots so the model can actually read the
+// text, and we process more pages (questions are often NOT on the first 1-2
+// cover/instruction pages).
+const VISION_RENDER_SCALE = Number(process.env.PDF_VISION_SCALE || 1.6);
+const VISION_PAGE_CAP = Number(process.env.DPP_VISION_PAGE_CAP || 12);
+
+/**
+ * Crop a normalized [x0,y0,x1,y1] region out of a full-page PNG buffer and
+ * return a PNG buffer of just that region (with a little padding). Used to
+ * pull individual diagrams out of a rendered scanned page.
+ */
+async function cropRegionToPng(pngBuffer, box, pad = 0.02) {
+  try {
+    const img = await loadImage(pngBuffer);
+    const W = img.width;
+    const H = img.height;
+    let [x0, y0, x1, y1] = box;
+    // add padding
+    x0 = Math.max(0, x0 - pad);
+    y0 = Math.max(0, y0 - pad);
+    x1 = Math.min(1, x1 + pad);
+    y1 = Math.min(1, y1 + pad);
+    const sx = Math.floor(x0 * W);
+    const sy = Math.floor(y0 * H);
+    const sw = Math.max(1, Math.ceil((x1 - x0) * W));
+    const sh = Math.max(1, Math.ceil((y1 - y0) * H));
+    const canvas = createCanvas(sw, sh);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvas.toBuffer("image/png");
+  } catch (e) {
+    console.warn("[parse-pdf] figure crop failed:", e.message);
+    return null;
+  }
+}
+
+/** Reject with a clear error if `promise` doesn't settle within `ms`. */
+function withTimeout(promise, ms, label = "operation") {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 const uploadImage = multer({
   storage: multer.memoryStorage(),
@@ -463,6 +530,20 @@ export function buildAdminRouter(storage) {
 
       let questions = [];
       let parserUsed = "heuristic";
+      // Vision context (populated by the AI Pro Max / vision path):
+      //   visionAnswers   : questionNumber -> { correctIndex, explanation } from any answer key / solutions page
+      //   visionPageBuffers: pageNumber -> rendered PNG buffer, used to crop out diagrams
+      const visionAnswers = new Map();
+      const visionPageBuffers = new Map();
+      const mergeVisionAnswers = (answers) => {
+        for (const a of answers || []) {
+          if (a.number == null) continue;
+          const prev = visionAnswers.get(a.number) || { correctIndex: null, explanation: "" };
+          if (prev.correctIndex == null && a.correctIndex != null) prev.correctIndex = a.correctIndex;
+          if (!prev.explanation && a.explanation) prev.explanation = a.explanation;
+          visionAnswers.set(a.number, prev);
+        }
+      };
 
       const saveAsDocument = async (storagePath, storageBackend) => {
         const doc = {
@@ -513,24 +594,29 @@ export function buildAdminRouter(storage) {
         questions = parseHeuristic(text);
         parserUsed = "heuristic";
       };
-      const tryGemini = async () => {
-        questions = await parseWithGemini(text, { modelName: process.env.GEMINI_MODEL || "gemini-3-flash-preview", source: "pdf-ai" });
-        parserUsed = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
-      };
-      const tryDppGemini = async () => {
+      // AI Pro Max: one smart Gemini handler that reads text PDFs, scanned /
+      // image-only PDFs (via page rendering + vision), and single images.
+      const tryGeminiSmart = async () => {
         questions = [];
-        parserUsed = process.env.GEMINI_DPP_MODEL || process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+        parserUsed = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
         const fastPageCap = Number(process.env.DPP_FAST_PAGE_CAP || 2);
 
         if (isImageUpload) {
           try {
-            questions = await parseWithGeminiVision({
-              imageBuffer: req.file.buffer,
-              mimeType: getMimeType(req.file.originalname, req.file.mimetype),
-              modelName: parserUsed,
-              pageNumber: 1,
-              source: "dpp-ai",
-            });
+            const res = await withTimeout(
+              parseWithGeminiVision({
+                imageBuffer: req.file.buffer,
+                mimeType: getMimeType(req.file.originalname, req.file.mimetype),
+                modelName: parserUsed,
+                pageNumber: 1,
+                source: "dpp-ai",
+              }),
+              GEMINI_CALL_TIMEOUT_MS,
+              "Gemini vision (image)"
+            );
+            questions = res.questions;
+            mergeVisionAnswers(res.answers);
+            visionPageBuffers.set(1, req.file.buffer);
             return;
           } catch (e) {
             console.warn(`[parse-pdf] Gemini vision failed, falling back to heuristic: ${e.message}`);
@@ -542,26 +628,76 @@ export function buildAdminRouter(storage) {
 
         if (fileType === "pdf") {
           if (!text || isScanned) {
-            const pageNumbers = Array.from({ length: Math.min(pageCount, fastPageCap) }, (_, i) => i + 1);
-            const rendered = await renderPagesToPng(req.file.buffer, pageNumbers, 1.8);
-            try {
-              for (const [pageNumber, pngBuffer] of rendered.entries()) {
-                const pageQuestions = await parseWithGeminiVision({
+            // Process every page (bounded) — questions are frequently NOT on the
+            // first couple of cover / instruction pages.
+            const visionCap = Math.max(fastPageCap, VISION_PAGE_CAP);
+            const pageNumbers = Array.from(
+              { length: Math.min(pageCount, visionCap) },
+              (_, i) => i + 1
+            );
+            const rendered = await renderPagesToPng(req.file.buffer, pageNumbers, VISION_RENDER_SCALE);
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            const readPage = async (pngBuffer, pageNumber) =>
+              withTimeout(
+                parseWithGeminiVision({
                   imageBuffer: pngBuffer,
                   mimeType: "image/png",
                   modelName: parserUsed,
                   pageNumber,
                   source: "dpp-ai",
-                });
-                questions.push(...pageQuestions);
+                }),
+                GEMINI_CALL_TIMEOUT_MS,
+                `Gemini vision (page ${pageNumber})`
+              );
+            try {
+              const failedPages = [];
+              for (const [pageNumber, pngBuffer] of rendered.entries()) {
+                visionPageBuffers.set(pageNumber, pngBuffer);
+                try {
+                  const res = await readPage(pngBuffer, pageNumber);
+                  questions.push(...res.questions);
+                  mergeVisionAnswers(res.answers);
+                  console.log(`[parse-pdf] vision page ${pageNumber} -> ${res.questions.length} question(s), ${res.answers.length} answer(s)`);
+                } catch (pageErr) {
+                  // One bad page shouldn't kill the whole upload — retry it once.
+                  console.warn(`[parse-pdf] vision page ${pageNumber} failed: ${pageErr.message}; will retry`);
+                  failedPages.push(pageNumber);
+                }
+                await sleep(350); // smooth out request rate to avoid 429 bursts
               }
-              if (pageCount > fastPageCap) {
-                console.warn(`[parse-pdf] fast DPP cap hit: rendered ${fastPageCap}/${pageCount} pages to keep the upload responsive`);
+              // Retry any pages that failed the first time (transient 503/timeout).
+              for (const pageNumber of failedPages) {
+                const pngBuffer = rendered.get(pageNumber);
+                if (!pngBuffer) continue;
+                try {
+                  await sleep(800);
+                  const res = await readPage(pngBuffer, pageNumber);
+                  questions.push(...res.questions);
+                  mergeVisionAnswers(res.answers);
+                  console.log(`[parse-pdf] vision page ${pageNumber} (retry) -> ${res.questions.length} question(s)`);
+                } catch (retryErr) {
+                  console.warn(`[parse-pdf] vision page ${pageNumber} failed again: ${retryErr.message}`);
+                }
+              }
+              if (pageCount > visionCap) {
+                console.warn(`[parse-pdf] vision cap hit: rendered ${visionCap}/${pageCount} pages`);
+              }
+              // Fall back if vision produced nothing at all (blank/low-quality
+              // scans, or the model returned an empty set for every page).
+              if (questions.length === 0) {
+                console.warn("[parse-pdf] Gemini vision returned 0 questions — falling back.");
+                if (isGroqAvailable() && text) {
+                  questions = await parseWithGroq(text);
+                  parserUsed = "groq";
+                } else if (text) {
+                  questions = parseHeuristic(text);
+                  parserUsed = "heuristic";
+                }
               }
               return;
             } catch (e) {
               console.warn(`[parse-pdf] Gemini vision page parse failed, falling back to Groq: ${e.message}`);
-              if (isGroqAvailable()) {
+              if (isGroqAvailable() && text) {
                 questions = await parseWithGroq(text);
                 parserUsed = "groq";
                 return;
@@ -573,10 +709,14 @@ export function buildAdminRouter(storage) {
           }
 
           try {
-            questions = await parseWithGemini(text, {
-              modelName: parserUsed,
-              source: "dpp-ai",
-            });
+            questions = await withTimeout(
+              parseWithGemini(text, {
+                modelName: parserUsed,
+                source: "dpp-ai",
+              }),
+              GEMINI_CALL_TIMEOUT_MS,
+              "Gemini text (PDF)"
+            );
             return;
           } catch (e) {
             console.warn(`[parse-pdf] Gemini text PDF parse failed, falling back to Groq: ${e.message}`);
@@ -592,7 +732,11 @@ export function buildAdminRouter(storage) {
         }
 
         try {
-          questions = await parseWithGemini(text, { modelName: parserUsed, source: "dpp-ai" });
+          questions = await withTimeout(
+            parseWithGemini(text, { modelName: parserUsed, source: "dpp-ai" }),
+            GEMINI_CALL_TIMEOUT_MS,
+            "Gemini text"
+          );
           return;
         } catch (e) {
           console.warn(`[parse-pdf] Gemini text parse failed, falling back to Groq: ${e.message}`);
@@ -610,15 +754,14 @@ export function buildAdminRouter(storage) {
         parserUsed = "raw";
       };
 
-      if (requestedMode === "dpp") {
-        await tryDppGemini();
-      } else if (requestedMode === "groq") {
+      if (requestedMode === "groq") {
         await tryGroq();
-      } else if (requestedMode === "gemini" || requestedMode === "ai") {
+      } else if (requestedMode === "gemini" || requestedMode === "ai" || requestedMode === "dpp") {
+        // "AI Pro Max" — smart Gemini path (text + scanned/vision + images).
         if (!isGeminiAvailable()) {
-          return res.status(400).json({ error: "Gemini mode requested but GEMINI_API_KEY is not set on the server." });
+          return res.status(400).json({ error: "AI Pro Max requested but GEMINI_API_KEY is not set on the server." });
         }
-        await tryGemini();
+        await tryGeminiSmart();
       } else if (requestedMode === "heuristic") {
         tryHeuristic();
       } else if (requestedMode === "raw") {
@@ -635,6 +778,88 @@ export function buildAdminRouter(storage) {
           }
         } else {
           tryHeuristic();
+        }
+      }
+
+      // ---- 2b. Match the solution / answer sheet (usually at the end of the
+      // paper) back onto each question by question number. Works for every
+      // parser so answers & explanations get filled even on the fast parsers. ----
+      if (text && questions.length > 0) {
+        try {
+          const { questions: withSolutions, matched } = applySolutionSheet(questions, text);
+          questions = withSolutions;
+          if (matched > 0) {
+            console.log(`[parse-pdf] solution sheet matched ${matched}/${questions.length} question(s)`);
+          }
+        } catch (e) {
+          console.warn("[parse-pdf] solution sheet matching failed:", e.message);
+        }
+      }
+
+      // ---- 2c. Vision answer-key linkage: attach the correct option + solution
+      // that AI Pro Max read off the answer-key / solutions pages, matched by
+      // question number (falls back to sequential order). ----
+      if (visionAnswers.size > 0 && questions.length > 0) {
+        let linked = 0;
+        questions = questions.map((q, i) => {
+          const num = Number.isInteger(q.number) ? q.number : i + 1;
+          const sol = visionAnswers.get(num);
+          if (!sol) return q;
+          const next = { ...q };
+          let did = false;
+          if (sol.correctIndex != null && Array.isArray(next.options) && next.options.length > sol.correctIndex) {
+            next.correctIndex = sol.correctIndex;
+            did = true;
+          }
+          if (sol.explanation && !String(next.explanation || "").trim()) {
+            next.explanation = sol.explanation;
+            did = true;
+          }
+          if (did) linked++;
+          return next;
+        });
+        if (linked > 0) console.log(`[parse-pdf] vision answer key linked ${linked}/${questions.length} question(s)`);
+      }
+
+      // ---- 2d. Crop each question's diagram out of its rendered page and
+      // attach it as pageImageUrl (real per-question figures, not full pages). ----
+      if (visionPageBuffers.size > 0 && questions.length > 0) {
+        let cropped = 0;
+        questions = await Promise.all(
+          questions.map(async (q, i) => {
+            if (!q.figureBox || !Number.isInteger(q.pageNumber)) return q;
+            const pageBuf = visionPageBuffers.get(q.pageNumber);
+            if (!pageBuf) return q;
+            const cropBuf = await cropRegionToPng(pageBuf, q.figureBox);
+            if (!cropBuf) return q;
+            const name = `q${i + 1}`;
+            try {
+              await saveFigureImage({ docId: documentId, name, buffer: cropBuf });
+              cropped++;
+              return {
+                ...q,
+                hasFigure: true,
+                pageImageUrl: `/api/documents/${documentId}/figures/${name}.png`,
+              };
+            } catch (e) {
+              console.warn(`[parse-pdf] saveFigureImage q${i + 1} failed: ${e.message}`);
+              return q;
+            }
+          })
+        );
+        if (cropped > 0) console.log(`[parse-pdf] cropped ${cropped} diagram(s) from pages`);
+      }
+
+      // ---- 2e. Persist the full-page snapshots the vision pass rendered, so the
+      // admin can always re-crop a diagram from the ORIGINAL page (even if the
+      // auto-crop cut it wrong). The manual crop tool loads these. ----
+      if (visionPageBuffers.size > 0) {
+        for (const [pageNumber, buf] of visionPageBuffers.entries()) {
+          try {
+            await savePageImage({ docId: documentId, pageNumber, buffer: buf });
+          } catch (e) {
+            console.warn(`[parse-pdf] save source page ${pageNumber} failed: ${e.message}`);
+          }
         }
       }
 
@@ -682,13 +907,30 @@ export function buildAdminRouter(storage) {
       }
 
       const figurePageSet = new Set();
+      // (a) pages referenced by AI questions that carry page + figure metadata
       for (const q of questions) {
         if (!Number.isInteger(q.pageNumber)) continue;
         if (q.hasFigure || pageHasImageMap.get(q.pageNumber)) {
           figurePageSet.add(q.pageNumber);
         }
       }
-      const figurePages = [...figurePageSet];
+      // (b) ANY page that actually contains an image/diagram — this makes the
+      // fast parsers (AI Pro / Groq / heuristic) also capture diagrams
+      // automatically instead of needing manual screenshots. The fallback
+      // attach logic below links these snapshots to figure-referencing questions.
+      // NOTE: Only add pages with images when at least one question on that page
+      // was flagged hasFigure by the AI, otherwise every page on a scanned PDF
+      // gets attached to every question (cluttering questions with no diagram).
+      for (const [pageNumber, hasImage] of pageHasImageMap.entries()) {
+        if (!hasImage) continue;
+        // only include this page if at least one question actually references a figure on it
+        const anyOnThisPage = questions.some(
+          (q) => q.hasFigure && q.pageNumber === pageNumber
+        );
+        if (anyOnThisPage) figurePageSet.add(pageNumber);
+      }
+      // Bound the work so a figure-heavy paper can't OOM / time out the request.
+      const figurePages = [...figurePageSet].sort((a, b) => a - b).slice(0, MAX_FIGURE_PAGES);
 
       const likelyFigureText = (q) => {
         const text = `${q?.text || ""} ${(Array.isArray(q?.options) ? q.options.join(" ") : "")}`.toLowerCase();
@@ -726,7 +968,7 @@ export function buildAdminRouter(storage) {
           // Render all pages that reference figures. If vector image bounds
           // are present we'll crop via those; otherwise the pdf-render
           // pixel-fallback will auto-crop the non-white bbox.
-          const rendered = await renderPagesToPng(req.file.buffer, figurePages, 1.8, figureBoundsMap);
+          const rendered = await renderPagesToPng(req.file.buffer, figurePages, PDF_RENDER_SCALE, figureBoundsMap);
           console.log(`[parse-pdf] rendered ${rendered.size}/${figureBoundsMap.size} page(s), saving…`);
           for (const [pageNumber, pngBuf] of rendered) {
             try {
@@ -746,6 +988,8 @@ export function buildAdminRouter(storage) {
 
       // Attach pageImageUrl to every question that has a saved snapshot
       questions = questions.map((q) => {
+        // Preserve a precise per-question diagram crop if we already made one.
+        if (q.pageImageUrl) return q;
         let pageNumber = Number.isInteger(q.pageNumber) ? q.pageNumber : null;
         let url = pageNumber ? pageImageMap[pageNumber] : null;
 
@@ -817,6 +1061,31 @@ export function buildAdminRouter(storage) {
         return res.json({ ok: true, path: saved.path, url: `/api/documents/${docId}/pages/${pageNumber}.png` });
       } catch (e) {
         console.error("[admin crop] error:", e);
+        return res.status(500).json({ error: String(e.message || e) });
+      }
+    }
+  );
+
+  // ---- Save a PER-QUESTION figure crop (admin only) ----
+  // POST /api/admin/documents/:id/figures/crop
+  // multipart/form-data field `file` (PNG). Stores a NEW unique figure image so
+  // cropping one question never overwrites another question on the same page.
+  // Returns { ok, url } — caller sets it as that question's pageImageUrl.
+  r.post(
+    "/documents/:id/figures/crop",
+    requireAdmin,
+    uploadImage.single("file"),
+    async (req, res) => {
+      try {
+        const docId = req.params.id;
+        if (!req.file || !req.file.buffer) return res.status(400).json({ error: "No file uploaded (field: file)" });
+        const doc = await storage.getDocument?.(docId);
+        if (!doc) return res.status(404).json({ error: "Document not found" });
+        const name = "crop_" + crypto.randomBytes(5).toString("hex");
+        await saveFigureImage({ docId, name, buffer: req.file.buffer });
+        return res.json({ ok: true, url: `/api/documents/${docId}/figures/${name}.png` });
+      } catch (e) {
+        console.error("[admin figure crop] error:", e);
         return res.status(500).json({ error: String(e.message || e) });
       }
     }

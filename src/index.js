@@ -19,7 +19,7 @@ import { supabaseStorage } from "./storage/supabase.js";
 import { buildAdminRouter } from "./admin-routes.js";
 import { buildReferralRouter } from "./referral-routes.js";
 import { createCommissionForOrder, ensureReferralCode, recordReferral } from "./referral.js";
-import { getPageImageBytes } from "./storage/pdf-storage.js";
+import { getPageImageBytes, getFigureImageBytes } from "./storage/pdf-storage.js";
 import { saveCaptureImage, CAPTURES_LOCAL_DIR } from "./storage/capture-storage.js";
 import { hashPassword } from "./password.js";
 import { answerWithGemini } from "./parsers/gemini.js";
@@ -306,6 +306,22 @@ app.get("/api/documents/:id/pages/:n.png", async (req, res) => {
     const doc = await storage.getDocument?.(docId);
     const backend = doc?.storageBackend || (process.env.STORAGE === "supabase" ? "supabase" : "local");
     const buf = await getPageImageBytes({ docId, pageNumber, backend });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buf);
+  } catch (e) {
+    res.status(404).json({ error: String(e.message || e) });
+  }
+});
+
+// Public: serve per-question figure crops (diagrams cropped out of a page).
+app.get("/api/documents/:id/figures/:name.png", async (req, res) => {
+  try {
+    const docId = req.params.id;
+    const name = req.params.name;
+    const doc = await storage.getDocument?.(docId);
+    const backend = doc?.storageBackend || (process.env.STORAGE === "supabase" ? "supabase" : "local");
+    const buf = await getFigureImageBytes({ docId, name, backend });
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buf);

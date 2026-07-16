@@ -116,6 +116,48 @@ export async function savePageImage({ docId, pageNumber, buffer }) {
   return { backend: "local", path: fullPath, sizeBytes: buffer.length };
 }
 
+// ---- Per-question figure crops (a diagram cropped out of a page) ----
+// Stored under <docId>/figures/<name>.png so a page can hold many crops.
+
+function sanitizeName(name) {
+  return String(name || "fig").replace(/[^\w.\-]+/g, "_");
+}
+
+export async function saveFigureImage({ docId, name, buffer }) {
+  const useSupabase = process.env.STORAGE === "supabase";
+  const filename = `${sanitizeName(name)}.png`;
+  if (useSupabase) {
+    if (!supabase) {
+      throw new Error("Supabase storage is configured (STORAGE=supabase) but keys are not set.");
+    }
+    const objectKey = `${docId}/figures/${filename}`;
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(objectKey, buffer, { contentType: "image/png", upsert: true });
+    if (error) throw error;
+    return { backend: "supabase", path: `${BUCKET}/${objectKey}`, sizeBytes: buffer.length };
+  }
+  const dir = path.join(LOCAL_PAGES_DIR, docId, "figures");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const fullPath = path.join(dir, filename);
+  fs.writeFileSync(fullPath, buffer);
+  return { backend: "local", path: fullPath, sizeBytes: buffer.length };
+}
+
+export async function getFigureImageBytes({ docId, name, backend }) {
+  const filename = `${sanitizeName(name)}.png`;
+  if (backend === "supabase") {
+    if (!supabase) throw new Error("Supabase storage configured but keys are not set.");
+    const key = `${docId}/figures/${filename}`;
+    const { data, error } = await supabase.storage.from(BUCKET).download(key);
+    if (error) throw error;
+    return Buffer.from(await data.arrayBuffer());
+  }
+  const fullPath = path.join(LOCAL_PAGES_DIR, docId, "figures", filename);
+  if (!fs.existsSync(fullPath)) throw new Error("Figure image not found");
+  return fs.readFileSync(fullPath);
+}
+
 /** Fetch a stored page image. Mirrors getPdfBytes. */
 export async function getPageImageBytes({ docId, pageNumber, backend }) {
   if (backend === "supabase") {

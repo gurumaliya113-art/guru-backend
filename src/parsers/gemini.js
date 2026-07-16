@@ -7,10 +7,13 @@ import crypto from "crypto";
 
 const newId = () => "q_" + crypto.randomBytes(4).toString("hex");
 
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const DEFAULT_DPP_MODEL = process.env.GEMINI_DPP_MODEL || DEFAULT_MODEL;
 
-const FALLBACK_MODELS = ["gemini-3-flash-preview", "gemini-2.0-flash"];
+// Stable, generally-available models. gemini-2.5-flash is fast + reliable;
+// gemini-flash-latest is the fallback. We deliberately avoid preview models
+// (e.g. gemini-3-*-preview) which frequently return 503 (overloaded).
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-flash-latest"];
 
 let preferredTextModel = null;
 let preferredVisionModel = null;
@@ -102,31 +105,46 @@ async function generateWithGeminiFallback({
   const apiKeys = getGeminiApiKeys();
   let lastError = null;
 
-  for (const modelName of candidates) {
-    for (const apiKey of apiKeys) {
-      const model = buildModel({ modelName, systemInstruction, responseMimeType, apiKey });
+  // Google's free tier frequently returns 503 "high demand". These spikes are
+  // transient, so we retry the whole model/key sweep a few times with growing
+  // backoff before giving up. This alone recovers most failed pages.
+  const maxRounds = Number(process.env.GEMINI_RETRY_ROUNDS || 4);
+  const backoffMs = [0, 2000, 5000, 12000];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-      try {
-        const result = await model.generateContent(payload);
-        if (kind === "vision") preferredVisionModel = modelName;
-        else if (kind === "chat") preferredChatModel = modelName;
-        else preferredTextModel = modelName;
-        return result;
-      } catch (err) {
-        const httpStatus = extractHttpStatus(err);
-        if (httpStatus === 401 || httpStatus === 403) {
+  for (let round = 0; round < maxRounds; round++) {
+    if (round > 0) {
+      const wait = backoffMs[Math.min(round, backoffMs.length - 1)];
+      console.warn(`[Gemini Parser] all models busy — backoff ${wait}ms then retry (round ${round + 1}/${maxRounds})`);
+      await sleep(wait);
+    }
+
+    let sawRetryable = false;
+    for (const modelName of candidates) {
+      for (const apiKey of apiKeys) {
+        const model = buildModel({ modelName, systemInstruction, responseMimeType, apiKey });
+        try {
+          const result = await model.generateContent(payload);
+          if (kind === "vision") preferredVisionModel = modelName;
+          else if (kind === "chat") preferredChatModel = modelName;
+          else preferredTextModel = modelName;
+          return result;
+        } catch (err) {
+          const httpStatus = extractHttpStatus(err);
           lastError = err;
-          continue;
+          if (httpStatus === 401 || httpStatus === 403) {
+            continue;
+          }
+          if (!isRetryableGeminiError(httpStatus)) {
+            throw err;
+          }
+          sawRetryable = true;
+          console.warn(`[Gemini Parser] key ${apiKey.slice(0, 8)}… model ${modelName} failed with ${httpStatus || "unknown"}; trying next key/model`);
         }
-
-        lastError = err;
-        if (!isRetryableGeminiError(httpStatus)) {
-          throw err;
-        }
-
-        console.warn(`[Gemini Parser] key ${apiKey.slice(0, 8)}… model ${modelName} failed with ${httpStatus || "unknown"}; trying next key/model`);
       }
     }
+    // If nothing was retryable (e.g. all auth failures), don't keep looping.
+    if (!sawRetryable) break;
   }
 
   throw lastError || new Error("Gemini API error: all fallback models failed.");
@@ -222,24 +240,32 @@ export async function parseWithGemini(rawText, options = {}) {
   }
 }
 
-const DPP_SYSTEM_PROMPT = `You are an expert at extracting DPP-style practice questions from Indian exam material.
+const DPP_SYSTEM_PROMPT = `You are an expert at extracting questions from Indian exam papers (scanned images / PDF pages).
 
-Extract every question visible in the attached page or image. Return structured JSON only.
+Read the attached page image and return structured JSON only.
 
-For each question return:
-- text: full question stem, cleaned and preserved as written
+For EACH question on the page return:
+- number: the question's PRINTED number exactly as shown (integer). This is critical for matching answers later.
+- text: full question stem, cleaned and preserved as written.
 - options: array of exactly 4 strings in A/B/C/D order. If fewer are present, fill missing with empty strings.
-- correctIndex: 0-based index of the correct option. If unknown, return 0.
-- explanation: answer or solution text if visible, else empty string.
+- correctIndex: 0-based index of the correct option if it is marked/known on THIS page, else 0.
+- explanation: solution text if visible on this page, else empty string.
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics".
 - topic: short chapter name.
 - difficulty: "Easy" | "Moderate" | "Hard".
 - type: "MCQ" | "Assertion-Reason" | "Case-Based".
 - examType: array containing one or more of "NEET", "JEE", "BOARD".
-- pageNumber: page number supplied by the caller, if any.
-- hasFigure: true if the question references a figure, diagram, graph, circuit, or image.
+- hasFigure: true if the question has/refers to a figure, diagram, graph, circuit, or image.
+- figureBox: if hasFigure is true, the tight bounding box of that figure as normalized page coordinates [x0, y0, x1, y1] where each value is between 0 and 1 (0,0 = top-left, 1,1 = bottom-right). If there is no figure, return null.
 
-Preserve math notation exactly. Return ONLY valid JSON with shape { "questions": [...] }.`;
+ALSO, if this page contains an ANSWER KEY (e.g. "1. (c) 2. (b) ...") or a SOLUTIONS / EXPLANATIONS section, return them in an "answers" array. For each answer return:
+- number: the question number (integer).
+- correctIndex: 0-based index (A=0, B=1, C=2, D=3) of the correct option, if given.
+- explanation: the solution / explanation text for that number, if given, else empty string.
+
+Preserve math notation exactly. Return ONLY valid JSON with shape:
+{ "questions": [...], "answers": [...] }
+Use an empty array when a section is absent. No prose, no markdown fences.`;
 
 export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, pageNumber, source = "dpp-ai" }) {
   if (!isGeminiAvailable()) {
@@ -254,7 +280,9 @@ export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, 
     },
   };
 
-  const prompt = pageNumber ? `Extract all questions from page ${pageNumber}.` : "Extract all questions from the attached image.";
+  const prompt = pageNumber
+    ? `Extract all questions, figure boxes, and any answer key / solutions from page ${pageNumber}.`
+    : "Extract all questions, figure boxes, and any answer key / solutions from the attached image.";
   const result = await generateWithGeminiFallback({
     kind: "vision",
     primaryModel: geminiModel,
@@ -271,7 +299,23 @@ export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, 
   }
 
   const list = Array.isArray(parsed?.questions) ? parsed.questions : [];
-  return list.map((q) => normalise(q, { source, pageNumber }));
+  const answers = Array.isArray(parsed?.answers)
+    ? parsed.answers
+        .map((a) => ({
+          number: Number.isInteger(a?.number) ? a.number : parseInt(a?.number, 10) || null,
+          correctIndex:
+            Number.isInteger(a?.correctIndex) && a.correctIndex >= 0 && a.correctIndex <= 3
+              ? a.correctIndex
+              : null,
+          explanation: String(a?.explanation || "").trim(),
+        }))
+        .filter((a) => a.number != null)
+    : [];
+
+  return {
+    questions: list.map((q) => normalise(q, { source, pageNumber })),
+    answers,
+  };
 }
 
 const ANSWER_SYSTEM_PROMPT = `You are a real-time study assistant for DPP practice questions.
@@ -330,8 +374,25 @@ function normalise(q, extras = {}) {
     type: allowedType.includes(q.type) ? q.type : "MCQ",
     examType: examType.length ? examType : ["NEET"],
     year: Number.isInteger(q.year) ? q.year : undefined,
+    number: Number.isInteger(q.number) ? q.number : (parseInt(q.number, 10) || undefined),
     pageNumber: Number.isInteger(extras.pageNumber) ? extras.pageNumber : (Number.isInteger(q.pageNumber) ? q.pageNumber : undefined),
     hasFigure: typeof q.hasFigure === "boolean" ? q.hasFigure : false,
+    figureBox: normaliseBox(q.figureBox),
     source: extras.source || "pdf-ai",
   };
+}
+
+/** Validate a normalized [x0,y0,x1,y1] box (each 0..1, x0<x1, y0<y1). */
+function normaliseBox(box) {
+  if (!Array.isArray(box) || box.length !== 4) return null;
+  const nums = box.map(Number);
+  if (nums.some((n) => !Number.isFinite(n))) return null;
+  let [x0, y0, x1, y1] = nums;
+  // clamp
+  x0 = Math.max(0, Math.min(1, x0));
+  y0 = Math.max(0, Math.min(1, y0));
+  x1 = Math.max(0, Math.min(1, x1));
+  y1 = Math.max(0, Math.min(1, y1));
+  if (x1 <= x0 || y1 <= y0) return null;
+  return [x0, y0, x1, y1];
 }

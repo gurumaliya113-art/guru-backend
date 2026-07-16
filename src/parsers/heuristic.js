@@ -56,6 +56,7 @@ export function parseHeuristic(rawText) {
         id: newId(),
         subject: "Physics",
         topic: "",
+        number: cur.number != null ? cur.number : null,
         text: cur.text.trim(),
         options: opts,
         correctIndex: cur.correctIndex != null ? cur.correctIndex : 0,
@@ -114,7 +115,13 @@ export function parseHeuristic(rawText) {
 
     if (qMatch) {
       push();
-      cur = { text: qMatch[2].trim(), options: ["", "", "", ""], correctIndex: null, explanation: "" };
+      cur = {
+        text: qMatch[2].trim(),
+        number: parseInt(qMatch[1], 10) || null,
+        options: ["", "", "", ""],
+        correctIndex: null,
+        explanation: "",
+      };
       const subchunks = splitInlineOptions(cur.text);
       if (subchunks.length > 1) {
         cur.text = "";
