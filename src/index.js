@@ -19,7 +19,8 @@ import { supabaseStorage } from "./storage/supabase.js";
 import { buildAdminRouter } from "./admin-routes.js";
 import { buildReferralRouter } from "./referral-routes.js";
 import { createCommissionForOrder, ensureReferralCode, recordReferral } from "./referral.js";
-import { getPageImageBytes, getFigureImageBytes } from "./storage/pdf-storage.js";
+import { getPageImageBytes, getFigureImageBytes, getPdfBytes, savePageImage } from "./storage/pdf-storage.js";
+import { renderPagesToPng } from "./parsers/pdf-render.js";
 import { saveCaptureImage, CAPTURES_LOCAL_DIR } from "./storage/capture-storage.js";
 import { hashPassword } from "./password.js";
 import { answerWithGemini } from "./parsers/gemini.js";
@@ -305,7 +306,25 @@ app.get("/api/documents/:id/pages/:n.png", async (req, res) => {
     }
     const doc = await storage.getDocument?.(docId);
     const backend = doc?.storageBackend || (process.env.STORAGE === "supabase" ? "supabase" : "local");
-    const buf = await getPageImageBytes({ docId, pageNumber, backend });
+    let buf;
+    try {
+      // Fast path: a page snapshot was already saved (during parse).
+      buf = await getPageImageBytes({ docId, pageNumber, backend });
+    } catch {
+      // On-demand fallback: the snapshot wasn't saved, but the source PDF is
+      // stored. Render just this page from the PDF so the admin can still open
+      // it and crop a diagram, then cache it for next time.
+      if (!doc || !doc.storagePath) throw new Error("Page image not found");
+      const pdfBuf = await getPdfBytes(doc.storagePath, doc.storageBackend);
+      const scale = Number(process.env.PDF_RENDER_SCALE || 2);
+      const rendered = await renderPagesToPng(pdfBuf, [pageNumber], scale);
+      buf = rendered.get(pageNumber);
+      if (!buf) throw new Error("Page image not found");
+      // Best-effort cache so subsequent loads are instant.
+      try { await savePageImage({ docId, pageNumber, buffer: buf }); } catch (e) {
+        console.warn("[pages] cache save failed:", e.message);
+      }
+    }
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(buf);
