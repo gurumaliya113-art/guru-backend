@@ -1091,6 +1091,32 @@ export function buildAdminRouter(storage) {
     }
   );
 
+  // ---- Upload a standalone diagram image for a question (admin only) ----
+  // POST /api/admin/upload-image
+  // multipart/form-data field `file` (PNG/JPEG). Unlike the crop routes this
+  // does NOT need a source PDF document — it lets an admin attach a diagram to
+  // a manually-typed question. Stored under the synthetic "manual" doc bucket.
+  // Returns { ok, url } — caller sets it as that question's pageImageUrl.
+  r.post(
+    "/upload-image",
+    requireAdmin,
+    uploadImage.single("file"),
+    async (req, res) => {
+      try {
+        if (!req.file || !req.file.buffer) {
+          return res.status(400).json({ error: "No file uploaded (field: file)" });
+        }
+        const docId = "manual";
+        const name = "img_" + crypto.randomBytes(6).toString("hex");
+        await saveFigureImage({ docId, name, buffer: req.file.buffer });
+        return res.json({ ok: true, url: `/api/documents/${docId}/figures/${name}.png` });
+      } catch (e) {
+        console.error("[admin upload-image] error:", e);
+        return res.status(500).json({ error: String(e.message || e) });
+      }
+    }
+  );
+
   // ---- Serve a saved PDF (for inline review of figure questions) ----
   // GET /api/admin/documents/:id/pdf  — streams bytes inline
   // Browsers can append #page=N to jump to a specific page.
