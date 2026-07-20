@@ -57,16 +57,27 @@ const upload = multer({
 //   give up and fall back to a fast parser.
 // MAX_FIGURE_PAGES: cap on how many figure snapshots we render per upload.
 const PDF_RENDER_SCALE = Number(process.env.PDF_RENDER_SCALE || 1.35);
-// Generous per-call budget: a single vision call may internally retry 503s
-// with backoff, so give it room before we abandon the page.
-const GEMINI_CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 120000);
-const MAX_FIGURE_PAGES = Number(process.env.MAX_FIGURE_PAGES || 6);
+// Per-call budget. Kept SHORT so one slow Gemini call can't drag the whole
+// request past the hosting gateway's timeout (which surfaces to the client as
+// a 502). A stuck page is abandoned and we move on / fall back.
+const GEMINI_CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 30000);
+const MAX_FIGURE_PAGES = Number(process.env.MAX_FIGURE_PAGES || 3);
+// If the parse has already spent this long by the time we reach the (optional)
+// figure-snapshot rendering step, SKIP it. Questions keep their pageNumber, so
+// the admin can still open+crop that page on demand later — we just don't block
+// the HTTP response (and risk a gateway 502) rendering images inline.
+const FIGURE_RENDER_BUDGET_MS = Number(process.env.FIGURE_RENDER_BUDGET_MS || 18000);
 // Scanned / image-only PDFs are read page-by-page with Gemini vision. We render
 // at a higher scale than figure snapshots so the model can actually read the
 // text, and we process more pages (questions are often NOT on the first 1-2
 // cover/instruction pages).
-const VISION_RENDER_SCALE = Number(process.env.PDF_VISION_SCALE || 1.6);
-const VISION_PAGE_CAP = Number(process.env.DPP_VISION_PAGE_CAP || 12);
+const VISION_RENDER_SCALE = Number(process.env.PDF_VISION_SCALE || 1.4);
+const VISION_PAGE_CAP = Number(process.env.DPP_VISION_PAGE_CAP || 8);
+// Overall wall-clock budget for the whole vision pass. Once exceeded we STOP
+// requesting more pages and return whatever questions we already have — a
+// partial-but-real result with HTTP 200 instead of a gateway 502. Sized to sit
+// safely under typical platform request timeouts.
+const PARSE_TIME_BUDGET_MS = Number(process.env.PARSE_TIME_BUDGET_MS || 45000);
 
 /**
  * Crop a normalized [x0,y0,x1,y1] region out of a full-page PNG buffer and
@@ -511,6 +522,10 @@ export function buildAdminRouter(storage) {
       const fileType = getFileType(req.file.originalname);
       const documentId = newDocumentId();
       const isImageUpload = fileType === "image";
+      // Wall-clock anchor for the whole request. Optional/heavy post-steps
+      // (figure rendering) are skipped once we're too close to the gateway
+      // timeout, so the endpoint always returns 200 instead of a 502.
+      const parseStartedAt = Date.now();
 
       // ---- 1. Extract text or parse image input ----
       console.log(`[parse-pdf] Starting extraction for ${fileType} with mode: ${requestedMode}`);
@@ -635,7 +650,6 @@ export function buildAdminRouter(storage) {
               { length: Math.min(pageCount, visionCap) },
               (_, i) => i + 1
             );
-            const rendered = await renderPagesToPng(req.file.buffer, pageNumbers, VISION_RENDER_SCALE);
             const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
             const readPage = async (pngBuffer, pageNumber) =>
               withTimeout(
@@ -650,8 +664,26 @@ export function buildAdminRouter(storage) {
                 `Gemini vision (page ${pageNumber})`
               );
             try {
-              const failedPages = [];
-              for (const [pageNumber, pngBuffer] of rendered.entries()) {
+              const startedAt = Date.now();
+              let stoppedEarly = false;
+              // Render + read ONE page at a time. Rendering lazily keeps peak
+              // memory to a single page (avoids OOM-driven 502s), and the
+              // wall-clock budget guarantees we return before the hosting
+              // gateway times out — a partial-but-real 200 instead of a 502.
+              for (const pageNumber of pageNumbers) {
+                if (Date.now() - startedAt > PARSE_TIME_BUDGET_MS) {
+                  stoppedEarly = true;
+                  console.warn(`[parse-pdf] time budget hit — stopping at page ${pageNumber}/${pageNumbers.length}`);
+                  break;
+                }
+                let pngBuffer;
+                try {
+                  const oneRendered = await renderPagesToPng(req.file.buffer, [pageNumber], VISION_RENDER_SCALE);
+                  pngBuffer = oneRendered.get(pageNumber);
+                } catch (renderErr) {
+                  console.warn(`[parse-pdf] render page ${pageNumber} failed: ${renderErr.message}`);
+                }
+                if (!pngBuffer) continue;
                 visionPageBuffers.set(pageNumber, pngBuffer);
                 try {
                   const res = await readPage(pngBuffer, pageNumber);
@@ -659,28 +691,14 @@ export function buildAdminRouter(storage) {
                   mergeVisionAnswers(res.answers);
                   console.log(`[parse-pdf] vision page ${pageNumber} -> ${res.questions.length} question(s), ${res.answers.length} answer(s)`);
                 } catch (pageErr) {
-                  // One bad page shouldn't kill the whole upload — retry it once.
-                  console.warn(`[parse-pdf] vision page ${pageNumber} failed: ${pageErr.message}; will retry`);
-                  failedPages.push(pageNumber);
+                  // A slow / failed page is skipped (not retried) so a single
+                  // bad page can never push the request past the time budget.
+                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped: ${pageErr.message}`);
                 }
-                await sleep(350); // smooth out request rate to avoid 429 bursts
+                await sleep(150); // gentle rate smoothing to avoid 429 bursts
               }
-              // Retry any pages that failed the first time (transient 503/timeout).
-              for (const pageNumber of failedPages) {
-                const pngBuffer = rendered.get(pageNumber);
-                if (!pngBuffer) continue;
-                try {
-                  await sleep(800);
-                  const res = await readPage(pngBuffer, pageNumber);
-                  questions.push(...res.questions);
-                  mergeVisionAnswers(res.answers);
-                  console.log(`[parse-pdf] vision page ${pageNumber} (retry) -> ${res.questions.length} question(s)`);
-                } catch (retryErr) {
-                  console.warn(`[parse-pdf] vision page ${pageNumber} failed again: ${retryErr.message}`);
-                }
-              }
-              if (pageCount > visionCap) {
-                console.warn(`[parse-pdf] vision cap hit: rendered ${visionCap}/${pageCount} pages`);
+              if (stoppedEarly || pageCount > visionCap) {
+                console.warn(`[parse-pdf] processed a subset of ${pageCount} page(s) (cap ${visionCap}, budget ${PARSE_TIME_BUDGET_MS}ms)`);
               }
               // Fall back if vision produced nothing at all (blank/low-quality
               // scans, or the model returned an empty set for every page).
@@ -962,7 +980,11 @@ export function buildAdminRouter(storage) {
       if (isImageUpload) {
         pageImageMap[1] = `/api/documents/${documentId}/pages/1.png`;
       }
-      if (figurePages.length > 0 && !isImageUpload && extracted?.pages) {
+      const figureBudgetLeft = (Date.now() - parseStartedAt) < FIGURE_RENDER_BUDGET_MS;
+      if (!figureBudgetLeft && figurePages.length > 0) {
+        console.warn(`[parse-pdf] skipping inline figure render (time budget) — ${figurePages.length} page(s) can be cropped on demand later`);
+      }
+      if (figurePages.length > 0 && !isImageUpload && extracted?.pages && figureBudgetLeft) {
         try {
           console.log(`[parse-pdf] rendering ${figurePages.length} figure page(s):`, figurePages.join(", "));
           // Render all pages that reference figures. If vector image bounds
