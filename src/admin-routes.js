@@ -889,26 +889,33 @@ export function buildAdminRouter(storage) {
                 }
                 visionPageBuffers.set(pageNumber, pngBuffer);
                 try {
-                  let res;
-                  try {
-                    res = await readPage(pngBuffer, pageNumber);
-                  } catch (firstErr) {
-                    // One retry — with a pool of keys a transient 429/timeout on
-                    // this page usually succeeds on the next attempt (a fresh,
-                    // non-parked key is picked). This is what keeps a page from
-                    // being marked failed just because a key ran out mid-page.
-                    console.warn(`[parse-pdf] vision page ${pageNumber} retry after: ${firstErr.message}`);
-                    await sleep(400);
-                    res = await readPage(pngBuffer, pageNumber);
+                  // Retry a page a few times with growing delays. Free-tier
+                  // rate limits (429) reset in ~a minute, and a fresh key is
+                  // picked each attempt — so waiting a few seconds usually turns
+                  // a "failed" page into a success instead of dropping it.
+                  let res = null;
+                  let lastErr = null;
+                  const attemptDelays = [0, 2500, 6000];
+                  for (let attempt = 0; attempt < attemptDelays.length; attempt++) {
+                    if (attemptDelays[attempt]) await sleep(attemptDelays[attempt]);
+                    try {
+                      res = await readPage(pngBuffer, pageNumber);
+                      lastErr = null;
+                      break;
+                    } catch (err) {
+                      lastErr = err;
+                      console.warn(`[parse-pdf] vision page ${pageNumber} attempt ${attempt + 1} failed: ${err.message}`);
+                    }
                   }
+                  if (lastErr) throw lastErr;
                   questions.push(...res.questions);
                   mergeVisionAnswers(res.answers);
                   console.log(`[parse-pdf] vision page ${pageNumber} -> ${res.questions.length} question(s), ${res.answers.length} answer(s)`);
                 } catch (pageErr) {
-                  // Still failed after a retry — skip so a single bad page can
-                  // never push the request past the time budget.
+                  // Still failed after all retries — skip so one bad page can
+                  // never stall the whole job.
                   pageFailed = true;
-                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped after retry: ${pageErr.message}`);
+                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped after retries: ${pageErr.message}`);
                 }
                 // Exactly-once per processed page: settles success or readPage
                 // failure into a single completePage emit.

@@ -27,7 +27,11 @@ let preferredChatModel = null;
 // over automatically — no manual swapping, and it keeps working day to day
 // because the cooldown expires on its own (quota resets restore the key).
 const keyCooldownUntil = new Map(); // apiKey -> epoch ms until which it's parked
-const KEY_COOLDOWN_MS = Number(process.env.GEMINI_KEY_COOLDOWN_MS || 30 * 60 * 1000); // 30 min default
+// Most free-tier 429s are per-MINUTE rate limits that clear in ~60s (not daily
+// quota). So we park a key for only ~60s — long enough to skip it during a
+// burst, short enough that it rejoins the pool quickly instead of draining all
+// keys after a few pages.
+const KEY_COOLDOWN_MS = Number(process.env.GEMINI_KEY_COOLDOWN_MS || 60 * 1000);
 
 // Human-readable label of the key that last succeeded, e.g. "Key 2 of 4".
 // Surfaced to the UI so the teacher can see live which key is running and when
