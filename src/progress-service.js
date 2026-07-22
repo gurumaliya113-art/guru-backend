@@ -92,7 +92,25 @@ export function createJobState(jobId, totalPages) {
     events: [],
     subscribers: new Set(),
     disposeTimer: undefined,
+    // Final parse result (questions + metadata), stored when the background job
+    // finishes so the client can fetch it via the result endpoint. Because the
+    // heavy parse now runs in the background (the HTTP request returns
+    // immediately to avoid gateway 502s on big PDFs), the questions are not in
+    // the POST response — they are picked up from here.
+    result: null,
   };
+}
+
+/** Store the final parse result for a job (questions + metadata). */
+export function setJobResult(jobId, result) {
+  const job = getJob(jobId);
+  if (job) job.result = result;
+}
+
+/** Read the final parse result for a job (null if not ready yet / unknown job). */
+export function getJobResult(jobId) {
+  const job = getJob(jobId);
+  return job ? job.result ?? null : null;
 }
 
 /**
@@ -229,7 +247,7 @@ export function buildEvent(job, type, extra = {}) {
  * Milliseconds to keep a terminal job's state alive before auto-disposing it, so
  * a slightly-late (or reconnecting) subscriber can still replay the final buffer.
  */
-const AUTO_DISPOSE_MS = 60000;
+const AUTO_DISPOSE_MS = Number(process.env.PROGRESS_DISPOSE_MS || 600000); // 10 min — keep result long enough to fetch
 
 /**
  * Emit an event for a job: build the shared payload via `buildEvent`, push it to

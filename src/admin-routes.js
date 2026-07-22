@@ -19,7 +19,7 @@ import {
   newDocumentId,
 } from "./storage/pdf-storage.js";
 import { summarizeCommissions, cancelCommissionForOrder } from "./referral.js";
-import { subscribe, createJob, startPage, completePage, completeJob, stopJob, failJob, isTerminal } from "./progress-service.js";
+import { subscribe, createJob, startPage, completePage, completeJob, stopJob, failJob, isTerminal, setJobResult, getJobResult } from "./progress-service.js";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 const upload = multer({
@@ -620,6 +620,19 @@ export function buildAdminRouter(storage) {
     });
   });
 
+  // ---- Parse result (fetched after the background job finishes) ----
+  // GET /api/admin/parse-pdf/result/:jobId
+  //   Because /parse-pdf now runs the heavy extraction in the BACKGROUND (the
+  //   POST returns immediately so a big PDF can never hit the gateway's request
+  //   timeout / 502), the extracted questions are not in the POST response. The
+  //   client polls this endpoint until the result is ready (HTTP 200); a 202
+  //   means "still processing".
+  r.get("/parse-pdf/result/:jobId", requireAdmin, (req, res) => {
+    const result = getJobResult(req.params.jobId);
+    if (!result) return res.status(202).json({ ready: false });
+    res.json({ ready: true, ...result });
+  });
+
   // ---- PDF upload + parse (full pipeline) ----
   // POST /api/admin/parse-pdf
   //   multipart form-data, field "file"
@@ -649,6 +662,19 @@ export function buildAdminRouter(storage) {
       classLevel: req.body?.classLevel || null,
       notes: req.body?.notes || null,
     };
+
+    // Async mode (opt-in via `async=1`): the heavy vision extraction can take
+    // minutes for a large PDF. If we held the HTTP request open that whole time,
+    // the hosting gateway (Railway/proxy, ~60s) would kill it with a 502. So we
+    // return the jobId right away; the client watches live progress over SSE and
+    // fetches the finished questions from /parse-pdf/result/:jobId. The parse
+    // keeps running after this response is sent (Node keeps the async function
+    // alive). When `async` is not set, we behave exactly as before (respond with
+    // the questions at the end) so existing callers keep working.
+    const wantAsync = (req.body?.async ?? req.query?.async ?? "") === "1";
+    if (wantAsync) {
+      res.json({ jobId, async: true, accepted: true });
+    }
 
     try {
       const fileType = getFileType(req.file.originalname);
@@ -1063,10 +1089,13 @@ export function buildAdminRouter(storage) {
       } else if (requestedMode === "gemini" || requestedMode === "ai" || requestedMode === "dpp") {
         // "AI Pro Max" — smart Gemini path (text + scanned/vision + images).
         if (!isGeminiAvailable()) {
-          // Early exit before any page work — close the stream so a subscribed
-          // client is not left hanging. Guarded so we never double-emit.
-          if (!isTerminal(jobId)) stopJob(jobId, { reason: "AI Pro Max requested but GEMINI_API_KEY is not set on the server." });
-          return res.status(400).json({ error: "AI Pro Max requested but GEMINI_API_KEY is not set on the server." });
+          // No key configured — record the error for the client's result poll
+          // and end the job. (Response already sent; no res here.)
+          const msg = "AI Pro Max requested but GEMINI_API_KEY is not set on the server.";
+          setJobResult(jobId, { error: msg });
+          if (!isTerminal(jobId)) failJob(jobId, { message: msg });
+          if (!wantAsync && !res.headersSent) res.status(400).json({ error: msg });
+          return;
         }
         await tryGeminiSmart();
       } else if (requestedMode === "heuristic") {
@@ -1184,14 +1213,14 @@ export function buildAdminRouter(storage) {
           });
         } catch (e) {
           console.error("[parse-pdf] PDF byte storage failed:", e.message);
-          // Close the stream on this early exit so a subscribed client is not
-          // left hanging. Guarded so we never double-emit a terminal event.
-          if (!isTerminal(jobId)) stopJob(jobId, { reason: `Failed to save PDF bytes: ${e.message}` });
-          return res.status(500).json({
-            error: `Failed to save PDF bytes: ${e.message}`,
-            parser: parserUsed,
-            questions,
-          });
+          // Record the error for the client's result poll and end the job.
+          // (Response already sent; no res here.)
+          setJobResult(jobId, { error: `Failed to save PDF bytes: ${e.message}`, parser: parserUsed });
+          if (!isTerminal(jobId)) failJob(jobId, { message: `Failed to save PDF bytes: ${e.message}` });
+          if (!wantAsync && !res.headersSent) {
+            res.status(500).json({ error: `Failed to save PDF bytes: ${e.message}`, parser: parserUsed, questions });
+          }
+          return;
         }
       }
 
@@ -1339,6 +1368,21 @@ export function buildAdminRouter(storage) {
       // documentId to every returned question so the frontend can link them on Save All.
       const questionsOut = questions.map((q) => ({ ...cleanQuestionArtifacts(q), documentId }));
 
+      // Store the final result so the client can fetch it (the POST already
+      // returned). Set BEFORE the terminal event fires so it's ready when the
+      // client sees "complete"/"stopped".
+      setJobResult(jobId, {
+        documentId,
+        parser: parserUsed,
+        pageCount,
+        textLength: text.length,
+        isScanned: false,
+        questionsCount: questions.length,
+        questions: questionsOut,
+        questionsSaved,
+        saved: true,
+      });
+
       // ---- Terminal progress event (Component 3: parse-pdf instrumentation).
       // Emit the normal `complete` only if the job did not already reach a
       // terminal state (vision budget/cap stopJob, or an unreadable failJob).
@@ -1349,30 +1393,35 @@ export function buildAdminRouter(storage) {
       //   • the vision full-completion case (all pages processed) completes;
       //   • zero-page jobs yield the 0/0/100 terminal values.
       // Additive / fire-and-forget — the HTTP response below is unchanged.
+      // Result is already stored above; emit the normal terminal completion
+      // unless the job already ended (budget stop / failure).
       if (!isTerminal(jobId)) completeJob(jobId);
 
-      res.json({
-        documentId,
-        parser: parserUsed,
-        pageCount,
-        textLength: text.length,
-        isScanned: false,
-        questionsCount: questions.length,
-        questions: questionsOut,
-        questionsSaved,
-        saved: true, // PDF + document row are always saved now
-      });
+      // Sync callers get the questions in the response (unchanged behavior).
+      if (!wantAsync && !res.headersSent) {
+        res.json({
+          documentId,
+          parser: parserUsed,
+          pageCount,
+          textLength: text.length,
+          isScanned: false,
+          questionsCount: questions.length,
+          questions: questionsOut,
+          questionsSaved,
+          saved: true,
+        });
+      }
     } catch (e) {
       console.error("[parse-pdf] error:", e);
-      // A thrown extraction error also leaves progress subscribers hanging.
-      // Notify them with a terminal failure — guarded so we never double-emit a
-      // terminal event if the job already reached one (complete/stopped/failure).
+      // Record the error for the client's result poll and emit a terminal
+      // failure (guarded against a double terminal).
+      setJobResult(jobId, { error: String(e.message || e) });
       if (jobId && !isTerminal(jobId)) {
         failJob(jobId, {
           message: "Could not read this file — it may be corrupted or password-protected.",
         });
       }
-      res.status(500).json({ error: String(e.message || e) });
+      if (!wantAsync && !res.headersSent) res.status(500).json({ error: String(e.message || e) });
     }
   });
 
