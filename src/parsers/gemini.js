@@ -1,6 +1,6 @@
 // Gemini (Google AI Studio) question parser / answer helper.
 // FREE tier: https://aistudio.google.com/app/apikey
-// Default model: gemini-3-flash-preview to match the active AI Studio model.
+// Default model: gemini-2.5-flash (stable, fast, reliable on the free tier).
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
@@ -280,7 +280,7 @@ export async function parseWithGemini(rawText, options = {}) {
     }
 
     if (httpStatus === 404) {
-      throw new Error(`Gemini model "${geminiModel}" not found. Try: gemini-3-flash-preview or gemini-2.0-flash`);
+      throw new Error(`Gemini model "${geminiModel}" not found. Try: gemini-2.5-flash or gemini-flash-latest`);
     }
 
     if (httpStatus === 429) {

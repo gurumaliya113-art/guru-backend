@@ -793,7 +793,7 @@ export function buildAdminRouter(storage) {
       // image-only PDFs (via page rendering + vision), and single images.
       const tryGeminiSmart = async () => {
         questions = [];
-        parserUsed = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+        parserUsed = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         const fastPageCap = Number(process.env.DPP_FAST_PAGE_CAP || 2);
 
         if (isImageUpload) {

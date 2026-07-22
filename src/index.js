@@ -1533,7 +1533,7 @@ Chapter context: ${chapter || "Unknown"}`;
     const response = await answerWithGemini({
       message,
       conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
-      modelName: process.env.GEMINI_DPP_CHAT_MODEL || process.env.GEMINI_DPP_MODEL || process.env.GEMINI_MODEL || "gemini-3-flash-preview",
+      modelName: process.env.GEMINI_DPP_CHAT_MODEL || process.env.GEMINI_DPP_MODEL || process.env.GEMINI_MODEL || "gemini-2.5-flash",
       systemInstruction: systemPrompt,
     });
 
