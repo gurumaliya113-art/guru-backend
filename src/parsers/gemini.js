@@ -145,14 +145,21 @@ async function generateWithGeminiFallback({
   const backoffMs = [0, 2000, 5000, 12000];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // Only sleep between rounds when we saw a TRANSIENT overload (503/5xx/404).
+  // For pure 429 (quota) rounds we must NOT sleep — the key is already parked,
+  // and sleeping would waste the per-page timeout and make that page fail while
+  // rotating. Instead we retry the remaining active keys immediately.
+  let backoffNext = false;
+
   for (let round = 0; round < maxRounds; round++) {
-    if (round > 0) {
+    if (round > 0 && backoffNext) {
       const wait = backoffMs[Math.min(round, backoffMs.length - 1)];
-      console.warn(`[Gemini Parser] all models busy — backoff ${wait}ms then retry (round ${round + 1}/${maxRounds})`);
+      console.warn(`[Gemini Parser] all models busy (overloaded) — backoff ${wait}ms then retry (round ${round + 1}/${maxRounds})`);
       await sleep(wait);
     }
 
     let sawRetryable = false;
+    let sawOverload = false; // 503/5xx/404 — transient, worth a backoff
     // Recompute each round so keys whose cooldown just expired rejoin the pool.
     const apiKeys = activeKeys(allKeys);
     for (const modelName of candidates) {
@@ -177,12 +184,16 @@ async function generateWithGeminiFallback({
             throw err;
           }
           sawRetryable = true;
-          // 429 = this key's quota/rate is spent — park it so later pages skip it.
+          // 429 = this key's quota/rate is spent — park it so later pages skip
+          // it, and rotate to the next key immediately (no backoff). Other
+          // retryable errors (503/5xx/404) are transient overloads worth a wait.
           if (httpStatus === 429) markKeyExhausted(apiKey);
+          else sawOverload = true;
           console.warn(`[Gemini Parser] key ${apiKey.slice(0, 8)}… model ${modelName} failed with ${httpStatus || "unknown"}; trying next key/model`);
         }
       }
     }
+    backoffNext = sawOverload;
     // If nothing was retryable (e.g. all auth failures), don't keep looping.
     if (!sawRetryable) break;
   }

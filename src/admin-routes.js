@@ -863,15 +863,26 @@ export function buildAdminRouter(storage) {
                 }
                 visionPageBuffers.set(pageNumber, pngBuffer);
                 try {
-                  const res = await readPage(pngBuffer, pageNumber);
+                  let res;
+                  try {
+                    res = await readPage(pngBuffer, pageNumber);
+                  } catch (firstErr) {
+                    // One retry — with a pool of keys a transient 429/timeout on
+                    // this page usually succeeds on the next attempt (a fresh,
+                    // non-parked key is picked). This is what keeps a page from
+                    // being marked failed just because a key ran out mid-page.
+                    console.warn(`[parse-pdf] vision page ${pageNumber} retry after: ${firstErr.message}`);
+                    await sleep(400);
+                    res = await readPage(pngBuffer, pageNumber);
+                  }
                   questions.push(...res.questions);
                   mergeVisionAnswers(res.answers);
                   console.log(`[parse-pdf] vision page ${pageNumber} -> ${res.questions.length} question(s), ${res.answers.length} answer(s)`);
                 } catch (pageErr) {
-                  // A slow / failed page is skipped (not retried) so a single
-                  // bad page can never push the request past the time budget.
+                  // Still failed after a retry — skip so a single bad page can
+                  // never push the request past the time budget.
                   pageFailed = true;
-                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped: ${pageErr.message}`);
+                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped after retry: ${pageErr.message}`);
                 }
                 // Exactly-once per processed page: settles success or readPage
                 // failure into a single completePage emit.
