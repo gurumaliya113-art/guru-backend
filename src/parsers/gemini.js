@@ -19,6 +19,39 @@ let preferredTextModel = null;
 let preferredVisionModel = null;
 let preferredChatModel = null;
 
+// --- API key cooldown (automatic quota rotation) ---
+// Give the server a POOL of Gemini keys via GEMINI_API_KEYS=key1,key2,...,key10
+// When a key returns 429 (daily quota / rate limit exhausted) we "park" it on a
+// cooldown so every later page and request skips it and goes straight to a
+// working key. As each key's quota runs out it is parked and the next key takes
+// over automatically — no manual swapping, and it keeps working day to day
+// because the cooldown expires on its own (quota resets restore the key).
+const keyCooldownUntil = new Map(); // apiKey -> epoch ms until which it's parked
+const KEY_COOLDOWN_MS = Number(process.env.GEMINI_KEY_COOLDOWN_MS || 30 * 60 * 1000); // 30 min default
+
+// Human-readable label of the key that last succeeded, e.g. "Key 2 of 4".
+// Surfaced to the UI so the teacher can see live which key is running and when
+// it rotates to the next one.
+let currentKeyLabel = null;
+
+/** The Gemini key currently in use, e.g. "Key 2 of 4" (null if none used yet). */
+export function getGeminiKeyLabel() {
+  return currentKeyLabel;
+}
+
+function markKeyExhausted(apiKey) {
+  keyCooldownUntil.set(apiKey, Date.now() + KEY_COOLDOWN_MS);
+  console.warn(`[Gemini Parser] key ${String(apiKey).slice(0, 8)}… parked for ${Math.round(KEY_COOLDOWN_MS / 60000)}min (quota/429). Rotating to next key.`);
+}
+
+// Keys not currently parked. If EVERY key is parked, return all of them anyway —
+// better to retry an exhausted key than to give up entirely.
+function activeKeys(allKeys) {
+  const now = Date.now();
+  const active = allKeys.filter((k) => (keyCooldownUntil.get(k) || 0) <= now);
+  return active.length ? active : allKeys;
+}
+
 const SYSTEM_PROMPT = `You are an expert at extracting multiple-choice questions from Indian competitive exam papers (NEET / JEE / Board).
 
 Extract every question from the provided text. For each question return:
@@ -102,7 +135,7 @@ async function generateWithGeminiFallback({
     : preferredTextModel;
 
   const candidates = getGeminiCandidates(primaryModel, preferredModel);
-  const apiKeys = getGeminiApiKeys();
+  const allKeys = getGeminiApiKeys();
   let lastError = null;
 
   // Google's free tier frequently returns 503 "high demand". These spikes are
@@ -120,6 +153,8 @@ async function generateWithGeminiFallback({
     }
 
     let sawRetryable = false;
+    // Recompute each round so keys whose cooldown just expired rejoin the pool.
+    const apiKeys = activeKeys(allKeys);
     for (const modelName of candidates) {
       for (const apiKey of apiKeys) {
         const model = buildModel({ modelName, systemInstruction, responseMimeType, apiKey });
@@ -128,6 +163,9 @@ async function generateWithGeminiFallback({
           if (kind === "vision") preferredVisionModel = modelName;
           else if (kind === "chat") preferredChatModel = modelName;
           else preferredTextModel = modelName;
+          // Record which key (position in the full pool) is now running.
+          const poolIdx = allKeys.indexOf(apiKey);
+          currentKeyLabel = poolIdx >= 0 ? `Key ${poolIdx + 1} of ${allKeys.length}` : null;
           return result;
         } catch (err) {
           const httpStatus = extractHttpStatus(err);
@@ -139,6 +177,8 @@ async function generateWithGeminiFallback({
             throw err;
           }
           sawRetryable = true;
+          // 429 = this key's quota/rate is spent — park it so later pages skip it.
+          if (httpStatus === 429) markKeyExhausted(apiKey);
           console.warn(`[Gemini Parser] key ${apiKey.slice(0, 8)}… model ${modelName} failed with ${httpStatus || "unknown"}; trying next key/model`);
         }
       }

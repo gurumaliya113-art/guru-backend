@@ -4,7 +4,7 @@ import multer from "multer";
 import crypto from "crypto";
 import { adminLogin, adminLogout, requireAdmin } from "./auth.js";
 import { parseHeuristic } from "./parsers/heuristic.js";
-import { parseWithGemini, parseWithGeminiVision, isGeminiAvailable } from "./parsers/gemini.js";
+import { parseWithGemini, parseWithGeminiVision, isGeminiAvailable, getGeminiKeyLabel } from "./parsers/gemini.js";
 import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
 import { extractPdfPages } from "./parsers/pdf-extract.js";
 import { extractRawPdfPages } from "./parsers/pdf-raw.js";
@@ -19,6 +19,7 @@ import {
   newDocumentId,
 } from "./storage/pdf-storage.js";
 import { summarizeCommissions, cancelCommissionForOrder } from "./referral.js";
+import { subscribe, createJob, startPage, completePage, completeJob, stopJob, failJob, isTerminal } from "./progress-service.js";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 const upload = multer({
@@ -155,6 +156,25 @@ function getMimeType(filename, mimetype) {
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   return "application/octet-stream";
+}
+
+// Clean common PDF-extraction artifacts in a string:
+//   "√--x" / "√ — x" -> "√x"  (a square root's overline/vinculum bar is often
+//   extracted as one or more dashes between the √ and its radicand).
+function cleanExtractedText(s) {
+  if (typeof s !== "string") return s;
+  return s.replace(/√\s*[-–—−]{1,}\s*/g, "√");
+}
+
+// Apply text cleanup to a question's user-facing fields.
+function cleanQuestionArtifacts(q) {
+  if (!q || typeof q !== "object") return q;
+  return {
+    ...q,
+    text: cleanExtractedText(q.text),
+    options: Array.isArray(q.options) ? q.options.map(cleanExtractedText) : q.options,
+    explanation: cleanExtractedText(q.explanation),
+  };
 }
 
 export function buildAdminRouter(storage) {
@@ -495,6 +515,111 @@ export function buildAdminRouter(storage) {
     }
   });
 
+  // ---- Realtime parse progress (SSE) ----
+  // GET /api/admin/parse-pdf/progress/:jobId
+  //   Server-Sent Events stream of live page-level progress for a parse job.
+  //   Guarded by requireAdmin, which accepts either the admin session or
+  //   ?token=<adminToken> — EventSource cannot set the x-admin-token header, so
+  //   the frontend passes the same token in the query string.
+  //
+  //   The stream is a read-only observer of the Progress_Service. It NEVER
+  //   controls the running parse: closing the connection only unsubscribes; the
+  //   POST /parse-pdf request keeps running to completion regardless.
+  r.get("/parse-pdf/progress/:jobId", requireAdmin, (req, res) => {
+    const { jobId } = req.params;
+
+    // SSE headers — set before any body is written so the client opens the
+    // stream immediately. X-Accel-Buffering: no disables proxy buffering (e.g.
+    // nginx) so each event flushes right away instead of being batched.
+    res.status(200);
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") res.flushHeaders();
+    // Disable Nagle so small event writes are sent without delay, and open the
+    // stream with an initial comment so the client sees bytes immediately.
+    try {
+      res.socket?.setNoDelay?.(true);
+    } catch {
+      // Non-socket transports (e.g. test doubles) simply skip this.
+    }
+    res.write(": connected\n\n");
+
+    // Guard every write against a closed stream so a late event (or heartbeat)
+    // after res.end() can never throw. `ended` also prevents a double res.end()
+    // when the terminal event arrives during the synchronous subscribe replay.
+    let closed = false;
+    let ended = false;
+    let unsubscribe = () => {};
+
+    const finish = () => {
+      if (ended) return;
+      ended = true;
+      closed = true;
+      clearInterval(heartbeat);
+      unsubscribe();
+      try {
+        res.end();
+      } catch {
+        // Already closed by the client — nothing to do.
+      }
+    };
+
+    // Write one Progress_Event in SSE wire format:
+    //   event: <type>\n
+    //   data: <json>\n\n
+    // On a terminal event, close the stream after writing it.
+    const onEvent = (event) => {
+      if (closed) return;
+      try {
+        res.write(`event: ${event.type}\n`);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      } catch {
+        // Write failed (client vanished) — treat as closed.
+        finish();
+        return;
+      }
+      if (
+        event.type === "complete" ||
+        event.type === "stopped" ||
+        event.type === "failure"
+      ) {
+        finish();
+      }
+    };
+
+    // Heartbeat comment keeps intermediaries from closing an idle connection
+    // during long gaps between pages. Cleared on close / terminal via finish().
+    const heartbeat = setInterval(() => {
+      if (closed) return;
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        finish();
+      }
+    }, 15000);
+    if (typeof heartbeat.unref === "function") heartbeat.unref();
+
+    // Subscribe replays buffered events synchronously (total + any completed
+    // pages), then streams live events. If the job is ALREADY terminal, the
+    // replay delivers the terminal event and onEvent -> finish() ends the stream
+    // right here; the `ended` flag makes that safe against a double end.
+    unsubscribe = subscribe(jobId, onEvent);
+
+    // If the terminal event already fired during the synchronous replay (job was
+    // already complete/stopped/failed when we subscribed), finish() has already
+    // ended the stream — nothing more to wire up.
+    if (ended) return;
+
+    // Client disconnect: unsubscribe + clear heartbeat. Never touches the job.
+    req.on("close", () => {
+      closed = true;
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+  });
+
   // ---- PDF upload + parse (full pipeline) ----
   // POST /api/admin/parse-pdf
   //   multipart form-data, field "file"
@@ -505,6 +630,13 @@ export function buildAdminRouter(storage) {
   // Returns: { documentId?, parser, pageCount, textLength, isScanned, questions, saved }
   r.post("/parse-pdf", requireAdmin, upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded (field: file)" });
+
+    // jobId ties this parse to its live progress stream. The frontend generates
+    // it and sends it as a multipart field (parsed by multer into req.body) so it
+    // can open the SSE connection before this request returns; non-UI callers
+    // fall back to a server-generated UUID. Declared before the try so the outer
+    // catch can also notify subscribers if extraction throws.
+    const jobId = (req.body?.jobId && String(req.body.jobId)) || crypto.randomUUID();
 
     const requestedMode = (req.body?.mode || req.query?.mode || "auto").toLowerCase();
     // saveQuestions: controls whether extracted questions are inserted into the bank.
@@ -542,6 +674,28 @@ export function buildAdminRouter(storage) {
       const pagesHaveImages = extracted?.pages?.some((p) => p.hasImage) || isImageUpload;
       const totalChars = extracted?.pages?.reduce((s, p) => s + (p.text?.length || 0), 0) || 0;
       const isScanned = fileType === "pdf" && totalChars < 100;
+
+      // ---- Register the progress job (Component 3: parse-pdf instrumentation).
+      // Total_Pages is the PDF page count (already 1 for a single image upload).
+      // This runs BEFORE any parsing/looping begins so a subscribed client sees
+      // the initial `total` event first. All progress calls are additive,
+      // fire-and-forget side effects — extraction behaviour is unchanged when no
+      // client is connected.
+      createJob(jobId, { totalPages: pageCount });
+
+      // Unreadable / corrupt / password-protected document: extraction produced
+      // no usable pages (null result for a pdf/docx, or a pdf with zero pages).
+      // A scanned PDF with little text is NOT unreadable — it takes the vision
+      // path — so we only fail the genuinely-unreadable case. failJob is an
+      // additive signal; the HTTP response below is left unchanged.
+      const unreadable =
+        (fileType === "pdf" && (!extracted || pageCount === 0)) ||
+        (fileType === "docx" && !extracted);
+      if (unreadable) {
+        failJob(jobId, {
+          message: "Could not read this file — it may be corrupted or password-protected.",
+        });
+      }
 
       let questions = [];
       let parserUsed = "heuristic";
@@ -642,7 +796,16 @@ export function buildAdminRouter(storage) {
         }
 
         if (fileType === "pdf") {
-          if (!text || isScanned) {
+          // AI Pro Max ALWAYS reads the rendered PAGE IMAGE with Gemini vision —
+          // even for digital/text PDFs. Plain text extraction garbles math
+          // symbols (vector hats î ĵ k̂ -> "^i", roots √x -> "√--x", powers t²
+          // -> "^2^", sub/superscripts), which is the ROOT CAUSE of the messy
+          // questions. Vision reads the actual visual page and returns clean
+          // LaTeX, fixing all of it at the source instead of patching each
+          // artifact after the fact. Set DPP_TEXT_PDF_VISION=0 to fall back to
+          // the (faster but noisier) text path.
+          const useVisionForTextPdf = (process.env.DPP_TEXT_PDF_VISION ?? "1") === "1";
+          if (!text || isScanned || useVisionForTextPdf) {
             // Process every page (bounded) — questions are frequently NOT on the
             // first couple of cover / instruction pages.
             const visionCap = Math.max(fastPageCap, VISION_PAGE_CAP);
@@ -666,6 +829,9 @@ export function buildAdminRouter(storage) {
             try {
               const startedAt = Date.now();
               let stoppedEarly = false;
+              // Count pages we actually settled (success/failed/skipped) so the
+              // stop event can report an honest "processed N of M" reason.
+              let processedPages = 0;
               // Render + read ONE page at a time. Rendering lazily keeps peak
               // memory to a single page (avoids OOM-driven 502s), and the
               // wall-clock budget guarantees we return before the hosting
@@ -676,6 +842,11 @@ export function buildAdminRouter(storage) {
                   console.warn(`[parse-pdf] time budget hit — stopping at page ${pageNumber}/${pageNumbers.length}`);
                   break;
                 }
+                // Progress (additive, fire-and-forget): only start a page we
+                // actually intend to process — i.e. after the time-budget break
+                // check, so pages skipped by the budget are never "started".
+                startPage(jobId, pageNumber);
+                let pageFailed = false;
                 let pngBuffer;
                 try {
                   const oneRendered = await renderPagesToPng(req.file.buffer, [pageNumber], VISION_RENDER_SCALE);
@@ -683,7 +854,13 @@ export function buildAdminRouter(storage) {
                 } catch (renderErr) {
                   console.warn(`[parse-pdf] render page ${pageNumber} failed: ${renderErr.message}`);
                 }
-                if (!pngBuffer) continue;
+                if (!pngBuffer) {
+                  // Render threw or returned nothing — the page could not be
+                  // rendered. Count it as completed-but-failed, then continue.
+                  completePage(jobId, pageNumber, { failed: true });
+                  processedPages++;
+                  continue;
+                }
                 visionPageBuffers.set(pageNumber, pngBuffer);
                 try {
                   const res = await readPage(pngBuffer, pageNumber);
@@ -693,12 +870,30 @@ export function buildAdminRouter(storage) {
                 } catch (pageErr) {
                   // A slow / failed page is skipped (not retried) so a single
                   // bad page can never push the request past the time budget.
+                  pageFailed = true;
                   console.warn(`[parse-pdf] vision page ${pageNumber} skipped: ${pageErr.message}`);
                 }
+                // Exactly-once per processed page: settles success or readPage
+                // failure into a single completePage emit.
+                completePage(jobId, pageNumber, {
+                  failed: pageFailed,
+                  note: getGeminiKeyLabel() ? `Running on ${getGeminiKeyLabel()}` : "Running on Gemini vision",
+                });
+                processedPages++;
                 await sleep(150); // gentle rate smoothing to avoid 429 bursts
               }
               if (stoppedEarly || pageCount > visionCap) {
                 console.warn(`[parse-pdf] processed a subset of ${pageCount} page(s) (cap ${visionCap}, budget ${PARSE_TIME_BUDGET_MS}ms)`);
+                // The job ended with unprocessed pages (time budget hit or the
+                // PDF has more pages than the vision cap). Emit a terminal
+                // `stopped` event with an honest "processed N of M" reason
+                // instead of completing — completeJob is skipped for this job
+                // because stopJob makes it terminal (see the guarded
+                // completeJob before the success response). Additive /
+                // fire-and-forget; extraction behaviour is unchanged.
+                stopJob(jobId, {
+                  reason: `Stopped after processing ${processedPages} of ${pageCount} page(s) within the time budget.`,
+                });
               }
               // Fall back if vision produced nothing at all (blank/low-quality
               // scans, or the model returned an empty set for every page).
@@ -726,25 +921,105 @@ export function buildAdminRouter(storage) {
             }
           }
 
-          try {
-            questions = await withTimeout(
-              parseWithGemini(text, {
-                modelName: parserUsed,
-                source: "dpp-ai",
-              }),
-              GEMINI_CALL_TIMEOUT_MS,
-              "Gemini text (PDF)"
-            );
-            return;
-          } catch (e) {
-            console.warn(`[parse-pdf] Gemini text PDF parse failed, falling back to Groq: ${e.message}`);
-            if (isGroqAvailable()) {
-              questions = await parseWithGroq(text);
-              parserUsed = "groq";
-              return;
+          // Text PDF: process page-by-page so the teacher sees GENUINE
+          // per-page progress instead of one long wait that jumps 0% -> 100%.
+          // The extractor already gives us each page's text; we parse each page
+          // independently, trying Gemini first and falling back to Groq /
+          // heuristic FOR THAT PAGE, so progress keeps advancing with real
+          // results even when an AI call fails on a page. A wall-clock budget
+          // stops us before the hosting gateway times out (partial 200, not 502).
+          {
+            const pages = extracted?.pages || [];
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            const startedAt = Date.now();
+            let stoppedEarly = false;
+            let usedGemini = false;
+            let usedGroq = false;
+            let usedHeuristic = false;
+            // Once Gemini fails once (e.g. quota 429 or a timeout), stop trying it
+            // for the remaining pages — otherwise every page would eat the full
+            // GEMINI_CALL_TIMEOUT_MS before falling back, making progress crawl.
+            let geminiDead = false;
+
+            for (const pg of pages) {
+              if (Date.now() - startedAt > PARSE_TIME_BUDGET_MS) {
+                stoppedEarly = true;
+                console.warn(`[parse-pdf] text time budget hit — stopping at page ${pg.pageNumber}/${pages.length}`);
+                break;
+              }
+              startPage(jobId, pg.pageNumber);
+              let pageFailed = false;
+              let pageNote = null; // which engine/key processed this page (for the UI)
+              const pageText = (pg.text || "").trim();
+              if (pageText) {
+                let got = false;
+                // 1) Try Gemini (best quality) — but skip it once it has died.
+                if (!geminiDead) {
+                  try {
+                    const qs = await withTimeout(
+                      parseWithGemini(pageText, { modelName: parserUsed, source: "dpp-ai" }),
+                      GEMINI_CALL_TIMEOUT_MS,
+                      `Gemini text (PDF page ${pg.pageNumber})`
+                    );
+                    questions.push(...qs);
+                    usedGemini = true;
+                    got = true;
+                    // Show which key in the pool is currently running.
+                    pageNote = getGeminiKeyLabel() ? `Running on ${getGeminiKeyLabel()}` : "Running on Gemini";
+                  } catch (e1) {
+                    geminiDead = true; // don't waste time on Gemini for later pages
+                    console.warn(`[parse-pdf] Gemini page ${pg.pageNumber} failed; using fast parser for the rest: ${e1.message}`);
+                  }
+                }
+                // 2) Fall back to Groq / heuristic for this page.
+                if (!got) {
+                  try {
+                    if (isGroqAvailable()) {
+                      questions.push(...(await parseWithGroq(pageText)));
+                      usedGroq = true;
+                      pageNote = "Running on Groq (fast parser)";
+                    } else {
+                      questions.push(...parseHeuristic(pageText));
+                      usedHeuristic = true;
+                      pageNote = "Running on Heuristic parser";
+                    }
+                  } catch (e2) {
+                    try {
+                      questions.push(...parseHeuristic(pageText));
+                      usedHeuristic = true;
+                      pageNote = "Running on Heuristic parser";
+                    } catch {
+                      pageFailed = true;
+                    }
+                  }
+                }
+              }
+              // Real completion of this page — emits the live progress event.
+              completePage(jobId, pg.pageNumber, { failed: pageFailed, note: pageNote });
+              await sleep(120); // gentle rate smoothing between pages
             }
-            questions = parseHeuristic(text);
-            parserUsed = "heuristic";
+
+            // Reflect which engine actually produced the questions.
+            parserUsed = usedGemini
+              ? (process.env.GEMINI_MODEL || parserUsed)
+              : usedGroq
+              ? "groq"
+              : usedHeuristic
+              ? "heuristic"
+              : parserUsed;
+
+            // Safety net: if page-by-page produced nothing, try one whole-text pass.
+            if (questions.length === 0 && text) {
+              if (isGroqAvailable()) {
+                try { questions = await parseWithGroq(text); parserUsed = "groq"; } catch { /* ignore */ }
+              }
+              if (questions.length === 0) { questions = parseHeuristic(text); parserUsed = "heuristic"; }
+            }
+
+            // Ended before all pages due to the time budget -> honest stop.
+            if (stoppedEarly) {
+              stopJob(jobId, { reason: `Stopped within the time budget after processing part of the document.` });
+            }
             return;
           }
         }
@@ -777,6 +1052,9 @@ export function buildAdminRouter(storage) {
       } else if (requestedMode === "gemini" || requestedMode === "ai" || requestedMode === "dpp") {
         // "AI Pro Max" — smart Gemini path (text + scanned/vision + images).
         if (!isGeminiAvailable()) {
+          // Early exit before any page work — close the stream so a subscribed
+          // client is not left hanging. Guarded so we never double-emit.
+          if (!isTerminal(jobId)) stopJob(jobId, { reason: "AI Pro Max requested but GEMINI_API_KEY is not set on the server." });
           return res.status(400).json({ error: "AI Pro Max requested but GEMINI_API_KEY is not set on the server." });
         }
         await tryGeminiSmart();
@@ -895,6 +1173,9 @@ export function buildAdminRouter(storage) {
           });
         } catch (e) {
           console.error("[parse-pdf] PDF byte storage failed:", e.message);
+          // Close the stream on this early exit so a subscribed client is not
+          // left hanging. Guarded so we never double-emit a terminal event.
+          if (!isTerminal(jobId)) stopJob(jobId, { reason: `Failed to save PDF bytes: ${e.message}` });
           return res.status(500).json({
             error: `Failed to save PDF bytes: ${e.message}`,
             parser: parserUsed,
@@ -1043,8 +1324,21 @@ export function buildAdminRouter(storage) {
         }
       }
 
-      // Attach documentId to every returned question so the frontend can link them on Save All
-      const questionsOut = questions.map((q) => ({ ...q, documentId }));
+      // Clean PDF-extraction artifacts (e.g. "√--x" -> "√x") then attach
+      // documentId to every returned question so the frontend can link them on Save All.
+      const questionsOut = questions.map((q) => ({ ...cleanQuestionArtifacts(q), documentId }));
+
+      // ---- Terminal progress event (Component 3: parse-pdf instrumentation).
+      // Emit the normal `complete` only if the job did not already reach a
+      // terminal state (vision budget/cap stopJob, or an unreadable failJob).
+      // This single guarded call covers every successful parser path:
+      //   • non-vision fast paths (text / Groq / heuristic / raw) that emitted
+      //     only the initial `total` now get their `complete` (completedCount
+      //     === totalPages, percentage === 100);
+      //   • the vision full-completion case (all pages processed) completes;
+      //   • zero-page jobs yield the 0/0/100 terminal values.
+      // Additive / fire-and-forget — the HTTP response below is unchanged.
+      if (!isTerminal(jobId)) completeJob(jobId);
 
       res.json({
         documentId,
@@ -1059,6 +1353,14 @@ export function buildAdminRouter(storage) {
       });
     } catch (e) {
       console.error("[parse-pdf] error:", e);
+      // A thrown extraction error also leaves progress subscribers hanging.
+      // Notify them with a terminal failure — guarded so we never double-emit a
+      // terminal event if the job already reached one (complete/stopped/failure).
+      if (jobId && !isTerminal(jobId)) {
+        failJob(jobId, {
+          message: "Could not read this file — it may be corrupted or password-protected.",
+        });
+      }
       res.status(500).json({ error: String(e.message || e) });
     }
   });
