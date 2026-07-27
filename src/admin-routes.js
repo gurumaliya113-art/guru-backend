@@ -260,7 +260,12 @@ export function buildAdminRouter(storage) {
         type: q.type || "MCQ",
         examType: Array.isArray(q.examType) && q.examType.length ? q.examType : ["NEET"],
         year: q.year ?? undefined,
-        classLevel: q.classLevel || undefined,
+        // Multi-class: `classLevels` holds every class this question belongs to.
+        // `classLevel` stays as the PRIMARY (first) class for backward compat.
+        classLevels: Array.isArray(q.classLevels) && q.classLevels.length
+          ? [...new Set(q.classLevels.map((c) => String(c)).filter(Boolean))]
+          : (q.classLevel ? [String(q.classLevel)] : []),
+        classLevel: q.classLevel || (Array.isArray(q.classLevels) && q.classLevels.length ? String(q.classLevels[0]) : undefined),
         board: q.board || undefined,
         isNCERT: typeof q.isNCERT === "boolean" ? q.isNCERT : false,
         source: q.source || "manual",

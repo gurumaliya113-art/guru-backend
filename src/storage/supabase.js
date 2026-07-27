@@ -324,8 +324,24 @@ export const supabaseStorage = {
 
   async addQuestions(questions) {
     const dbPayload = questions.map(q => toSnakeCase(q));
-    const data = await upsertInChunks("questions", dbPayload, { onConflict: "id" });
-    return data.map(toCamelCase);
+    try {
+      const data = await upsertInChunks("questions", dbPayload, { onConflict: "id" });
+      return data.map(toCamelCase);
+    } catch (e) {
+      // Resilience: if the multi-class `class_levels` column hasn't been added
+      // to the DB yet (migration not run), Postgres rejects the whole insert.
+      // Strip that field and retry so saving never breaks; the primary
+      // `class_level` is still saved. Run supabase-questions-classlevels-migration.sql
+      // to enable true multi-class.
+      const msg = String(e?.message || e);
+      if (/class_levels/i.test(msg) || /column .* does not exist/i.test(msg)) {
+        console.warn("[addQuestions] class_levels column missing — retrying without it. Run the class_levels migration.");
+        const stripped = dbPayload.map(({ class_levels, ...rest }) => rest);
+        const data = await upsertInChunks("questions", stripped, { onConflict: "id" });
+        return data.map(toCamelCase);
+      }
+      throw e;
+    }
   },
 
   async updateQuestion(id, updates) {
