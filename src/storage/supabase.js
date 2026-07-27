@@ -334,9 +334,9 @@ export const supabaseStorage = {
       // `class_level` is still saved. Run supabase-questions-classlevels-migration.sql
       // to enable true multi-class.
       const msg = String(e?.message || e);
-      if (/class_levels/i.test(msg) || /column .* does not exist/i.test(msg)) {
-        console.warn("[addQuestions] class_levels column missing — retrying without it. Run the class_levels migration.");
-        const stripped = dbPayload.map(({ class_levels, ...rest }) => rest);
+      if (/class_levels|subtopic/i.test(msg) || /column .* does not exist/i.test(msg)) {
+        console.warn("[addQuestions] new column (class_levels/subtopic) missing — retrying without it. Run supabase-RUN-TODAY.sql.");
+        const stripped = dbPayload.map(({ class_levels, subtopic, ...rest }) => rest);
         const data = await upsertInChunks("questions", stripped, { onConflict: "id" });
         return data.map(toCamelCase);
       }

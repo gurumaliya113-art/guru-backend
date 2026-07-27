@@ -252,6 +252,7 @@ export function buildAdminRouter(storage) {
         id: q.id || "q_" + crypto.randomBytes(4).toString("hex"),
         subject: q.subject || "Physics",
         topic: q.topic || "",
+        subtopic: q.subtopic || undefined,
         text: q.text || "",
         options: Array.isArray(q.options) ? q.options.slice(0, 4) : ["", "", "", ""],
         correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
