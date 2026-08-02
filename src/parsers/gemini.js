@@ -70,6 +70,8 @@ Extract every question from the provided text. For each question return:
 - examType: array containing one or more of "NEET", "JEE", "BOARD". Default ["NEET"].
 - year: integer year if mentioned (e.g. PYQ 2022), else null.
 - Do not paraphrase, simplify, or rewrite notation. Preserve what is written in the source as closely as possible.
+
+ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if the paper does not print them, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from the answer key if known, else 0.
 - Preserve exact math notation. If you encounter corrupted fraction notation like '_{36}^x^2', 'x^2_36' or 'y^2_{16}' in the source, normalize it into correct LaTeX-style fraction form such as '\\frac{x^2}{36}' or '\\frac{y^2}{16}'.
 Return ONLY valid JSON of the shape: { "questions": [...] }
 No prose, no markdown fences.`;
@@ -312,6 +314,8 @@ For EACH question on the page return:
 - examType: array containing one or more of "NEET", "JEE", "BOARD".
 - hasFigure: true if the question has/refers to a figure, diagram, graph, circuit, or image.
 - figureBox: if hasFigure is true, the tight bounding box of that figure as normalized page coordinates [x0, y0, x1, y1] where each value is between 0 and 1 (0,0 = top-left, 1,1 = bottom-right). If there is no figure, return null.
+
+ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if not printed, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from any answer key on the page, else 0.
 
 ALSO, if this page contains an ANSWER KEY (e.g. "1. (c) 2. (b) ...") or a SOLUTIONS / EXPLANATIONS section, return them in an "answers" array. For each answer return:
 - number: the question number (integer).
