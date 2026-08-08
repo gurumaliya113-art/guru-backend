@@ -8,6 +8,59 @@ import { normaliseCorrectIndex, extractInlineAnswer } from "./answer-key.js";
 
 const newId = () => "q_" + crypto.randomBytes(4).toString("hex");
 
+// Gemini sometimes wraps JSON in markdown fences (```json ... ```), adds a
+// leading note, or emits a trailing comma — even when responseMimeType is set.
+// This extractor strips fences/prose and pulls out the first balanced JSON
+// object/array so a stray character no longer blows up the whole parse.
+function extractJsonFromText(raw) {
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+
+  // 1) direct parse (fast path)
+  try {
+    return JSON.parse(s);
+  } catch {}
+
+  // 2) strip markdown code fences ```json ... ``` or ``` ... ```
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fence && fence[1]) {
+    const inner = fence[1].trim();
+    try {
+      return JSON.parse(inner);
+    } catch {
+      s = inner; // fall through with the fenced content
+    }
+  }
+
+  // 3) slice from the first { or [ to the last matching } or ]
+  const firstObj = s.indexOf("{");
+  const firstArr = s.indexOf("[");
+  let start = -1;
+  let closeChar = "}";
+  if (firstObj === -1 && firstArr === -1) return null;
+  if (firstArr === -1 || (firstObj !== -1 && firstObj < firstArr)) {
+    start = firstObj;
+    closeChar = "}";
+  } else {
+    start = firstArr;
+    closeChar = "]";
+  }
+  const end = s.lastIndexOf(closeChar);
+  if (start !== -1 && end !== -1 && end > start) {
+    let candidate = s.slice(start, end + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // 4) last resort: drop trailing commas before } or ]
+      try {
+        return JSON.parse(candidate.replace(/,\s*([}\]])/g, "$1"));
+      } catch {}
+    }
+  }
+  return null;
+}
+
 const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const DEFAULT_DPP_MODEL = process.env.GEMINI_DPP_MODEL || DEFAULT_MODEL;
 
@@ -276,11 +329,9 @@ export async function parseWithGemini(rawText, options = {}) {
 
     console.log(`[Gemini Parser] Response received (${raw.length} chars), parsing JSON...`);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error(`[Gemini Parser] Failed to parse JSON response:`, raw.substring(0, 200));
+    let parsed = extractJsonFromText(raw);
+    if (parsed == null) {
+      console.error(`[Gemini Parser] Failed to parse JSON response:`, String(raw).substring(0, 200));
       throw new Error("Gemini returned non-JSON. Try the heuristic parser instead.");
     }
 
@@ -373,10 +424,9 @@ export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, 
     responseMimeType: "application/json",
   });
   const raw = result.response.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
+  let parsed = extractJsonFromText(raw);
+  if (parsed == null) {
+    console.error(`[Gemini Vision] Failed to parse JSON response:`, String(raw).substring(0, 300));
     throw new Error("Gemini returned non-JSON while parsing image input.");
   }
 
