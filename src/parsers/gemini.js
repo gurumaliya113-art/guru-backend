@@ -115,7 +115,7 @@ const SYSTEM_PROMPT = `You are an expert at extracting multiple-choice questions
 Extract every question from the provided text. For each question return:
 - text: the full question stem (clean, no "Q1." prefix)
 - options: array of exactly 4 strings (A, B, C, D in order). If fewer are present, fill missing with empty strings.
-- correctIndex: 0-based index of the correct option, taken ONLY from an answer key / marked answer / worked solution that is actually printed in the source. If the source does not state the answer, return null. NEVER guess, never solve the question yourself, and never default to 0 — a wrong answer is far worse than no answer.
+- correctIndex: 0-based index of the correct option. FIRST, if the source prints an answer key / marked answer / worked solution, use that. OTHERWISE, act as an expert Physics/Chemistry/Biology/Mathematics teacher and SOLVE the question yourself, then set correctIndex to the option you determine is correct. Only return null when you genuinely cannot answer — i.e. the 4 options are not all present, the options are blank, or essential data/figure needed to solve is missing/unreadable. Do NOT default to 0; pick the option you actually computed. When you solve it yourself, put a brief working in "explanation".
 - explanation: solution text if present in the source, else empty string.
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics" (best guess from content).
 - topic: short topic name e.g. "Electrostatics", "Organic Chemistry", "Genetics". Empty if unsure.
@@ -379,7 +379,7 @@ For EACH question on the page return:
 - number: the question's PRINTED number exactly as shown (integer). This is critical for matching answers later.
 - text: full question stem, cleaned and preserved as written.
 - options: array of exactly 4 strings in A/B/C/D order. If fewer are present, fill missing with empty strings.
-- correctIndex: 0-based index of the correct option ONLY if the answer is actually marked / printed on THIS page (ticked, bold, circled, or given in a key or worked solution). Otherwise return null. NEVER solve the question yourself, never guess, and never default to 0 — leaving it null is correct and expected when the page does not show the answer.
+- correctIndex: 0-based index of the correct option. FIRST, if the answer is marked / printed on THIS page (ticked, bold, circled, or given in a key or worked solution), use that. OTHERWISE, act as an expert Physics/Chemistry/Biology/Mathematics teacher and SOLVE the question yourself, then set correctIndex to the option you determine is correct. Only return null when you genuinely cannot answer — i.e. the 4 options are not all present, the options are blank, or essential data/figure needed to solve is missing/unreadable. Do NOT default to 0; pick the option you actually computed. When you solve it yourself, put a brief working in "explanation".
 - explanation: solution text if visible on this page, else empty string.
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics".
 - topic: short chapter name.
