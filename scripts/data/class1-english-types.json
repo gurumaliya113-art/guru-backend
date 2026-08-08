@@ -1,0 +1,17 @@
+{
+  "classLevel": "1",
+  "subject": "English",
+  "questions": [
+    { "type": "short", "topic": "Vocabulary", "text": "Write the opposite of 'big'.", "answer": "Small", "difficulty": "Easy" },
+    { "type": "short", "topic": "Grammar", "text": "Fill in: A ____ says 'meow'. (cat/dog)", "answer": "cat", "difficulty": "Easy" },
+    { "type": "short", "topic": "Alphabet", "text": "Which letter comes after 'C'?", "answer": "D", "difficulty": "Easy" },
+    { "type": "long", "topic": "Writing", "text": "Write two sentences about your favourite fruit.", "answer": "Example: My favourite fruit is mango. It is sweet and yellow.", "difficulty": "Moderate" },
+    { "type": "long", "topic": "Reading", "text": "Look at the word 'SUN'. Write one sentence using this word.", "answer": "Example: The sun gives us light and heat in the day.", "difficulty": "Moderate" },
+    { "type": "assertion", "topic": "Grammar", "text": "Assertion (A): 'Apple' begins with the letter A.\nReason (R): A is the first letter of the English alphabet.", "options": ["Both A and R are true and R explains A", "Both A and R are true but R does not explain A", "A is true but R is false", "A is false but R is true"], "correctIndex": 1, "explanation": "Both statements are true, but R (A being first letter) does not explain why 'apple' starts with A.", "difficulty": "Moderate" },
+    { "type": "match", "topic": "Vocabulary", "text": "Match the word with its opposite.", "options": ["Hot → Cold", "Day → Night", "Up → Down", "Open → Close"], "explanation": "Hot-Cold, Day-Night, Up-Down, Open-Close.", "difficulty": "Easy" },
+    { "type": "match", "topic": "Animals", "text": "Match the animal with the sound it makes.", "options": ["Dog → Bark", "Cow → Moo", "Cat → Meow", "Lion → Roar"], "explanation": "Dog-Bark, Cow-Moo, Cat-Meow, Lion-Roar.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Alphabet", "text": "There are 26 letters in the English alphabet.", "options": ["True", "False"], "correctIndex": 0, "explanation": "Yes, A to Z is 26 letters. True.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Grammar", "text": "'Banana' is the name of a vegetable.", "options": ["True", "False"], "correctIndex": 1, "explanation": "Banana is a fruit, not a vegetable. False.", "difficulty": "Easy" },
+    { "type": "fill", "topic": "Vocabulary", "text": "A baby dog is called a ____.", "options": ["kitten", "puppy", "calf", "cub"], "correctIndex": 1, "explanation": "A baby dog is a puppy.", "difficulty": "Easy" }
+  ]
+}

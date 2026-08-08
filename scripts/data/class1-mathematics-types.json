@@ -1,0 +1,19 @@
+{
+  "classLevel": "1",
+  "subject": "Mathematics",
+  "questions": [
+    { "type": "short", "topic": "Addition", "text": "Add: 3 + 4 = ?", "answer": "7", "difficulty": "Easy" },
+    { "type": "short", "topic": "Subtraction", "text": "Subtract: 9 - 5 = ?", "answer": "4", "difficulty": "Easy" },
+    { "type": "short", "topic": "Numbers", "text": "Write the number that comes after 19.", "answer": "20", "difficulty": "Easy" },
+    { "type": "short", "topic": "Counting", "text": "How many days are there in one week?", "answer": "7 days", "difficulty": "Easy" },
+    { "type": "long", "topic": "Addition", "text": "Riya has 5 red balls and 3 green balls. How many balls does she have in all? Show how you count.", "answer": "Riya has 5 + 3 = 8 balls in all. Count: start at 5, then add 3 more (6, 7, 8).", "difficulty": "Moderate" },
+    { "type": "long", "topic": "Shapes and Geometry", "text": "Name any two shapes you see around you and write one thing about each.", "answer": "Example: A clock is a circle — it is round with no corners. A book is a rectangle — it has 4 sides and 4 corners.", "difficulty": "Moderate" },
+    { "type": "assertion", "topic": "Numbers", "text": "Assertion (A): 10 is greater than 7.\nReason (R): When we count, 10 comes after 7.", "options": ["Both A and R are true and R explains A", "Both A and R are true but R does not explain A", "A is true but R is false", "A is false but R is true"], "correctIndex": 0, "explanation": "10 comes after 7 in counting, so 10 is greater — R correctly explains A.", "difficulty": "Moderate" },
+    { "type": "assertion", "topic": "Shapes and Geometry", "text": "Assertion (A): A triangle has 3 corners.\nReason (R): A triangle has 3 sides.", "options": ["Both A and R are true and R explains A", "Both A and R are true but R does not explain A", "A is true but R is false", "A is false but R is true"], "correctIndex": 0, "explanation": "A triangle has 3 sides and 3 corners; having 3 sides makes 3 corners. Both true and related.", "difficulty": "Moderate" },
+    { "type": "match", "topic": "Numbers", "text": "Match the number with its name.", "options": ["1 → One", "2 → Two", "5 → Five", "10 → Ten"], "explanation": "1-One, 2-Two, 5-Five, 10-Ten.", "difficulty": "Easy" },
+    { "type": "match", "topic": "Shapes and Geometry", "text": "Match the object with its shape.", "options": ["Ball → Circle", "Book → Rectangle", "Slice of pizza → Triangle", "Dice → Square face"], "explanation": "Ball-Circle, Book-Rectangle, Pizza slice-Triangle, Dice face-Square.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Addition", "text": "6 + 0 = 6.", "options": ["True", "False"], "correctIndex": 0, "explanation": "Adding zero does not change the number. True.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Comparison", "text": "10 is smaller than 4.", "options": ["True", "False"], "correctIndex": 1, "explanation": "10 is greater than 4, so this is False.", "difficulty": "Easy" },
+    { "type": "fill", "topic": "Counting", "text": "Count by tens: 10, 20, ____.", "options": ["25", "30", "40", "21"], "correctIndex": 1, "explanation": "10, 20, 30. The answer is 30.", "difficulty": "Moderate" }
+  ]
+}

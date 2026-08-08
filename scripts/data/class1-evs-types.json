@@ -1,0 +1,18 @@
+{
+  "classLevel": "1",
+  "subject": "EVS",
+  "questions": [
+    { "type": "short", "topic": "My Body", "text": "Name the body part we use to see.", "answer": "Eyes", "difficulty": "Easy" },
+    { "type": "short", "topic": "Animals", "text": "Which animal gives us milk?", "answer": "Cow (also buffalo, goat).", "difficulty": "Easy" },
+    { "type": "short", "topic": "Plants", "text": "Name one part of a plant that grows under the ground.", "answer": "Root", "difficulty": "Easy" },
+    { "type": "short", "topic": "Good Habits", "text": "What should we do before eating food?", "answer": "Wash our hands.", "difficulty": "Easy" },
+    { "type": "long", "topic": "My Family", "text": "Write two sentences about your family.", "answer": "Example: My family has my parents, my sister and me. We love and help each other.", "difficulty": "Moderate" },
+    { "type": "long", "topic": "Plants", "text": "Why are plants important to us? Write two reasons.", "answer": "Plants give us food to eat and fresh air (oxygen) to breathe. They also give shade and beauty.", "difficulty": "Moderate" },
+    { "type": "assertion", "topic": "Good Habits", "text": "Assertion (A): We should brush our teeth every day.\nReason (R): Brushing keeps our teeth clean and healthy.", "options": ["Both A and R are true and R explains A", "Both A and R are true but R does not explain A", "A is true but R is false", "A is false but R is true"], "correctIndex": 0, "explanation": "Brushing daily keeps teeth clean and healthy — R correctly explains A.", "difficulty": "Moderate" },
+    { "type": "assertion", "topic": "Animals", "text": "Assertion (A): Fish live in water.\nReason (R): Fish breathe using gills.", "options": ["Both A and R are true and R explains A", "Both A and R are true but R does not explain A", "A is true but R is false", "A is false but R is true"], "correctIndex": 0, "explanation": "Fish have gills to breathe in water, so they live in water. Both true and related.", "difficulty": "Moderate" },
+    { "type": "match", "topic": "Animals", "text": "Match the animal with its home.", "options": ["Cow → Shed", "Bird → Nest", "Dog → Kennel", "Bee → Hive"], "explanation": "Cow-Shed, Bird-Nest, Dog-Kennel, Bee-Hive.", "difficulty": "Easy" },
+    { "type": "match", "topic": "My Body", "text": "Match the body part with its use.", "options": ["Eyes → To see", "Ears → To hear", "Nose → To smell", "Tongue → To taste"], "explanation": "Eyes-see, Ears-hear, Nose-smell, Tongue-taste.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Plants", "text": "We should waste water while brushing.", "options": ["True", "False"], "correctIndex": 1, "explanation": "We should save water, not waste it. False.", "difficulty": "Easy" },
+    { "type": "truefalse", "topic": "Animals", "text": "A hen lays eggs.", "options": ["True", "False"], "correctIndex": 0, "explanation": "Yes, a hen lays eggs. True.", "difficulty": "Easy" }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "examType": "JEE",
+  "classLevel": "11",
+  "board": "CBSE",
+  "subject": "Mathematics",
+  "notes": [
+    {
+      "chapter": "Sets, Relations and Functions",
+      "title": "Sets, Relations and Functions — Complete JEE Notes",
+      "description": "## Overview\nFoundation of mathematics: sets, types of relations and functions.\n\n## 1. Sets\n- Operations: union, intersection, difference, complement. De Morgan's laws: (A∪B)' = A'∩B', (A∩B)' = A'∪B'.\n- n(A∪B) = n(A) + n(B) − n(A∩B). Power set has 2ⁿ subsets.\n\n## 2. Relations\n- A relation R ⊆ A×B. Types: reflexive (aRa), symmetric (aRb⇒bRa), transitive, **equivalence** (all three).\n\n## 3. Functions\n- Types: one-one (injective), onto (surjective), bijective.\n- Domain, codomain, range. Even f(−x)=f(x); odd f(−x)=−f(x).\n- Composite (fog)(x) = f(g(x)); inverse exists only for bijections.\n\n## 4. Standard Functions\n- Modulus, greatest integer [x], signum, exponential, logarithmic.\n\n## ⚠️ Common Traps\n- A function must assign exactly one image to each domain element.\n- Equivalence relation needs reflexive + symmetric + transitive.\n- Inverse exists only if the function is bijective.\n\n## 📝 Quick Recap\n- n(A∪B) formula; 2ⁿ subsets.\n- Equivalence relation conditions.\n- One-one/onto/bijection.\n\n## 🎯 Exam Tip\nFor JEE, master finding domain/range of composite functions and checking injectivity/surjectivity."
+    },
+    {
+      "chapter": "Trigonometric Functions",
+      "title": "Trigonometric Functions — Complete JEE Notes",
+      "description": "## Overview\nTrigonometric ratios, identities and equations — a JEE staple.\n\n## 1. Basics\n- Radian–degree: π rad = 180°. sin²θ + cos²θ = 1; 1+tan²θ = sec²θ; 1+cot²θ = csc²θ.\n\n## 2. Compound & Multiple Angles\n- sin(A±B) = sinA cosB ± cosA sinB; cos(A±B) = cosA cosB ∓ sinA sinB.\n- sin2A = 2 sinA cosA; cos2A = 1 − 2sin²A = 2cos²A − 1; tan2A = 2tanA/(1−tan²A).\n\n## 3. Transformations\n- Sum-to-product and product-to-sum formulae.\n\n## 4. Trigonometric Equations\n- General solutions: sinθ = sinα ⇒ θ = nπ + (−1)ⁿα; cosθ = cosα ⇒ θ = 2nπ ± α; tanθ = tanα ⇒ θ = nπ + α.\n\n## 5. Properties of Triangles\n- Sine rule a/sinA = 2R; cosine rule a² = b² + c² − 2bc cosA.\n\n## ⚠️ Common Traps\n- Always write the GENERAL solution for trig equations (include n).\n- Check the domain when squaring trig equations (extraneous roots).\n- Sign of ratios depends on the quadrant (ASTC rule).\n\n## 📝 Quick Recap\n- Pythagorean & compound-angle identities.\n- General solutions of sin/cos/tan equations.\n- Sine & cosine rules.\n\n## 🎯 Exam Tip\nMemorise the general-solution formulae — JEE trig equation problems hinge on them."
+    },
+    {
+      "chapter": "Complex Numbers and Quadratic Equations",
+      "title": "Complex Numbers & Quadratic Equations — Complete JEE Notes",
+      "description": "## Overview\nComplex number algebra, geometry and quadratic theory.\n\n## 1. Complex Numbers\n- z = a + ib; i² = −1. Modulus |z| = √(a²+b²); argument arg(z).\n- Conjugate z̄ = a − ib; |z|² = z·z̄.\n- **Polar form:** z = r(cosθ + i sinθ); Euler: z = re^{iθ}.\n- **De Moivre:** (cosθ + i sinθ)ⁿ = cos nθ + i sin nθ.\n\n## 2. Properties\n- |z₁z₂| = |z₁||z₂|; arg(z₁z₂) = arg z₁ + arg z₂.\n- Cube roots of unity: 1, ω, ω²; 1 + ω + ω² = 0, ω³ = 1.\n\n## 3. Quadratic Equations\n- Roots of ax² + bx + c = 0: x = (−b ± √D)/2a; discriminant D = b² − 4ac.\n- D > 0 (real distinct), D = 0 (equal), D < 0 (complex conjugate roots).\n- Sum of roots = −b/a; product = c/a.\n\n## ⚠️ Common Traps\n- For real coefficients, complex roots occur in conjugate pairs.\n- 1 + ω + ω² = 0 simplifies many expressions.\n- Don't forget the modulus is always non-negative.\n\n## 📝 Quick Recap\n- |z|, arg, polar form, De Moivre.\n- Cube roots of unity properties.\n- D and root relationships.\n\n## 🎯 Exam Tip\nUse cube roots of unity (ω) tricks and conjugate-root property — recurring JEE shortcuts."
+    },
+    {
+      "chapter": "Permutations and Combinations",
+      "title": "Permutations and Combinations — Complete JEE Notes",
+      "description": "## Overview\nCounting principles, arrangements and selections.\n\n## 1. Fundamental Principle of Counting\n- Multiplication (AND) and addition (OR) rules.\n\n## 2. Permutations (order matters)\n- ⁿPᵣ = n!/(n−r)!. Arrangements of n distinct = n!.\n- With repetition allowed: nʳ. Circular permutations: (n−1)!.\n- Identical objects: n!/(p!q!r!).\n\n## 3. Combinations (order does not matter)\n- ⁿCᵣ = n!/(r!(n−r)!). ⁿCᵣ = ⁿC₍ₙ₋ᵣ₎; ⁿCᵣ + ⁿC₍ᵣ₋₁₎ = ⁿ⁺¹Cᵣ.\n\n## 4. Applications\n- Distribution, selection with constraints, grouping problems.\n\n## ⚠️ Common Traps\n- Use permutation when order matters, combination when it doesn't.\n- Circular arrangements: fix one position → (n−1)!.\n- Watch for identical objects (divide by factorials).\n\n## 📝 Quick Recap\n- ⁿPᵣ = n!/(n−r)!; ⁿCᵣ = n!/(r!(n−r)!).\n- Circular = (n−1)!.\n- Pascal's identity.\n\n## 🎯 Exam Tip\nDecide order-matters vs not FIRST; that single decision picks P or C correctly."
+    },
+    {
+      "chapter": "Binomial Theorem",
+      "title": "Binomial Theorem — Complete JEE Notes",
+      "description": "## Overview\nExpansion of (a+b)ⁿ and its applications.\n\n## 1. Binomial Expansion\n- (a+b)ⁿ = Σ ⁿCᵣ aⁿ⁻ʳ bʳ (r = 0 to n).\n- General term: T₍ᵣ₊₁₎ = ⁿCᵣ aⁿ⁻ʳ bʳ.\n\n## 2. Key Results\n- Number of terms = n+1. Middle term: if n even, ((n/2)+1)th; if n odd, two middle terms.\n- Greatest coefficient; term independent of x (put exponent = 0).\n\n## 3. Properties\n- Sum of coefficients: put variables = 1. ⁿC₀ + ⁿC₁ + … + ⁿCₙ = 2ⁿ.\n- Sum of even-indexed = sum of odd-indexed = 2ⁿ⁻¹.\n\n## ⚠️ Common Traps\n- General term index: T₍ᵣ₊₁₎ (r starts at 0).\n- For term independent of x, set the power of x to zero.\n- Negative/fractional index needs the infinite series form (|x|<1).\n\n## 📝 Quick Recap\n- General term T₍ᵣ₊₁₎ = ⁿCᵣ aⁿ⁻ʳ bʳ.\n- Sum of coefficients = 2ⁿ.\n- Middle term rules.\n\n## 🎯 Exam Tip\nMost JEE questions ask for a specific/independent term — use the general term and solve for r."
+    },
+    {
+      "chapter": "Sequences and Series",
+      "title": "Sequences and Series — Complete JEE Notes",
+      "description": "## Overview\nArithmetic, geometric and harmonic progressions and special series.\n\n## 1. Arithmetic Progression (AP)\n- nth term: aₙ = a + (n−1)d. Sum: Sₙ = n/2[2a + (n−1)d] = n/2(a + l).\n- AM of a,b = (a+b)/2.\n\n## 2. Geometric Progression (GP)\n- nth term: aₙ = arⁿ⁻¹. Sum: Sₙ = a(rⁿ−1)/(r−1). Infinite sum (|r|<1): S∞ = a/(1−r).\n- GM of a,b = √(ab).\n\n## 3. Harmonic Progression & Means\n- HM of a,b = 2ab/(a+b). Relation: AM ≥ GM ≥ HM; GM² = AM × HM.\n\n## 4. Special Series\n- Σn = n(n+1)/2; Σn² = n(n+1)(2n+1)/6; Σn³ = [n(n+1)/2]².\n\n## ⚠️ Common Traps\n- AM ≥ GM ≥ HM (equality only when all terms equal).\n- Infinite GP sum needs |r| < 1.\n- GM² = AM × HM is a common shortcut.\n\n## 📝 Quick Recap\n- AP/GP nth term & sum formulae.\n- AM ≥ GM ≥ HM.\n- Σn, Σn², Σn³ formulae.\n\n## 🎯 Exam Tip\nThe AM–GM inequality solves many JEE maxima/minima problems quickly."
+    },
+    {
+      "chapter": "Straight Lines",
+      "title": "Straight Lines — Complete JEE Notes",
+      "description": "## Overview\nCoordinate geometry of lines: forms, slopes, distances and angles.\n\n## 1. Slope & Forms\n- Slope m = tanθ = (y₂−y₁)/(x₂−x₁).\n- Forms: slope-intercept y = mx + c; point-slope y − y₁ = m(x − x₁); two-point; intercept x/a + y/b = 1; normal form.\n\n## 2. Angle & Conditions\n- Angle between lines: tanθ = |(m₁−m₂)/(1+m₁m₂)|.\n- Parallel: m₁ = m₂. Perpendicular: m₁m₂ = −1.\n\n## 3. Distances\n- Distance of point (x₁,y₁) from ax+by+c=0: |ax₁+by₁+c|/√(a²+b²).\n- Distance between parallel lines: |c₁−c₂|/√(a²+b²).\n\n## 4. Other\n- Family of lines through intersection: L₁ + λL₂ = 0.\n\n## ⚠️ Common Traps\n- Perpendicular lines: product of slopes = −1 (vertical/horizontal are special cases).\n- Use the modulus in the distance formula.\n- A vertical line has an undefined slope.\n\n## 📝 Quick Recap\n- Slope, all line forms.\n- Angle, parallel & perpendicular conditions.\n- Point-line & parallel-line distances.\n\n## 🎯 Exam Tip\nUse the family of lines (L₁ + λL₂) for 'line through intersection' JEE problems."
+    },
+    {
+      "chapter": "Conic Sections",
+      "title": "Conic Sections — Complete JEE Notes",
+      "description": "## Overview\nCircle, parabola, ellipse and hyperbola — geometry and standard equations.\n\n## 1. Circle\n- (x−h)² + (y−k)² = r². General: x²+y²+2gx+2fy+c=0, centre (−g,−f), radius √(g²+f²−c).\n\n## 2. Parabola\n- y² = 4ax: vertex (0,0), focus (a,0), directrix x=−a, latus rectum = 4a.\n\n## 3. Ellipse\n- x²/a² + y²/b² = 1 (a>b): foci (±ae,0), e = √(1−b²/a²) <1, latus rectum 2b²/a.\n\n## 4. Hyperbola\n- x²/a² − y²/b² = 1: e = √(1+b²/a²) >1; asymptotes y = ±(b/a)x.\n\n## 5. Eccentricity Summary\n- Circle e=0, parabola e=1, ellipse 0<e<1, hyperbola e>1.\n\n## ⚠️ Common Traps\n- Eccentricity value identifies the conic.\n- Latus rectum: parabola 4a, ellipse/hyperbola 2b²/a.\n- For ellipse e<1, hyperbola e>1.\n\n## 📝 Quick Recap\n- Standard equations & key elements.\n- Eccentricity ranges.\n- Latus rectum formulae.\n\n## 🎯 Exam Tip\nLearn focus, directrix, eccentricity and latus rectum for each conic — JEE asks these directly."
+    },
+    {
+      "chapter": "Limits and Derivatives",
+      "title": "Limits and Derivatives — Complete JEE Notes",
+      "description": "## Overview\nIntroduction to calculus: limits, continuity and differentiation.\n\n## 1. Limits\n- lim(x→a) f(x). Standard: lim(x→0) sinx/x = 1; lim(x→0)(eˣ−1)/x = 1; lim(x→0)(1+x)^{1/x} = e.\n- Indeterminate forms (0/0, ∞/∞) → factorise, rationalise, or use standard limits.\n\n## 2. Derivatives (first principle)\n- f'(x) = lim(h→0)[f(x+h)−f(x)]/h.\n\n## 3. Standard Derivatives\n- d/dx(xⁿ)=nxⁿ⁻¹; d/dx(sinx)=cosx; d/dx(cosx)=−sinx; d/dx(eˣ)=eˣ; d/dx(lnx)=1/x.\n\n## 4. Rules\n- Product, quotient, and chain rules.\n\n## ⚠️ Common Traps\n- A limit exists only if LHL = RHL.\n- Remember lim(x→0) sinx/x = 1 only when x is in radians.\n- Apply the chain rule for composite functions.\n\n## 📝 Quick Recap\n- Standard limits (sinx/x, (eˣ−1)/x).\n- First-principle derivative.\n- Product/quotient/chain rules.\n\n## 🎯 Exam Tip\nLearn the standard limits cold — they convert most JEE limit problems into one step."
+    },
+    {
+      "chapter": "Statistics",
+      "title": "Statistics — Complete JEE Notes",
+      "description": "## Overview\nMeasures of central tendency and dispersion.\n\n## 1. Central Tendency\n- Mean, median, mode. Empirical relation: Mode = 3 Median − 2 Mean.\n\n## 2. Dispersion\n- Range, mean deviation, **variance** σ² and **standard deviation** σ.\n- Variance = (Σxᵢ²/n) − (mean)².\n\n## 3. Coefficient of Variation\n- CV = (σ/mean) × 100; compares variability of data sets (lower CV = more consistent).\n\n## ⚠️ Common Traps\n- Standard deviation is the positive square root of variance.\n- Variance is unaffected by adding a constant to all values; multiplied by k² if scaled by k.\n- Lower CV means more consistency.\n\n## 📝 Quick Recap\n- Mean, median, mode + empirical relation.\n- Variance & SD formulae.\n- CV for comparison.\n\n## 🎯 Exam Tip\nUse variance = mean of squares − square of mean for quick computation."
+    },
+    {
+      "chapter": "Probability",
+      "title": "Probability — Complete JEE Notes",
+      "description": "## Overview\nClassical probability, addition/multiplication rules and conditional probability.\n\n## 1. Basics\n- P(E) = favourable/total outcomes; 0 ≤ P(E) ≤ 1. P(E') = 1 − P(E).\n\n## 2. Addition & Multiplication\n- P(A∪B) = P(A) + P(B) − P(A∩B).\n- Independent events: P(A∩B) = P(A)P(B).\n- Mutually exclusive: P(A∩B) = 0.\n\n## 3. Conditional Probability & Bayes\n- P(A|B) = P(A∩B)/P(B).\n- **Bayes' theorem:** P(Eᵢ|A) = P(Eᵢ)P(A|Eᵢ)/ΣP(Eⱼ)P(A|Eⱼ).\n\n## 4. Random Variable\n- Expectation E(X) = Σ xᵢpᵢ. Binomial distribution: P(X=r) = ⁿCᵣ pʳq^{n−r}.\n\n## ⚠️ Common Traps\n- Mutually exclusive ≠ independent (they are different concepts).\n- Use Bayes' theorem for 'reverse' conditional probability.\n- Sum of all probabilities = 1.\n\n## 📝 Quick Recap\n- Addition & multiplication rules.\n- Conditional probability; Bayes.\n- Binomial distribution.\n\n## 🎯 Exam Tip\nIdentify whether events are independent or mutually exclusive before applying formulae — a common JEE trap."
+    }
+  ]
+}
