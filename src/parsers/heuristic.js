@@ -9,6 +9,7 @@
 // Quality is best-effort — admin should always review on the next screen.
 
 import crypto from "crypto";
+import { safeCorrectIndex } from "./answer-key.js";
 
 const QUESTION_START_RE = /^\s*(?:Q(?:uestion)?\s*)?(\d{1,3})\s*[\.\)\:]\s*(.+)$/i;
 const OPTION_RE = /^\s*(?:\(?([A-Da-d1-4])\)?(?:[\.\)\:\-])?\s*)(.*)$/;
@@ -59,7 +60,8 @@ export function parseHeuristic(rawText) {
         number: cur.number != null ? cur.number : null,
         text: cur.text.trim(),
         options: opts,
-        correctIndex: cur.correctIndex != null ? cur.correctIndex : 0,
+        // null when the paper printed no answer. Never 0 — see answer-key.js.
+        correctIndex: safeCorrectIndex(cur.correctIndex, opts.length),
         explanation: (cur.explanation || pendingExplanation || "").trim(),
         difficulty: "Moderate",
         type: "MCQ",

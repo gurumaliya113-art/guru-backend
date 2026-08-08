@@ -6,6 +6,7 @@ import { adminLogin, adminLogout, requireAdmin } from "./auth.js";
 import { parseHeuristic } from "./parsers/heuristic.js";
 import { parseWithGemini, parseWithGeminiVision, isGeminiAvailable, getGeminiKeyLabel } from "./parsers/gemini.js";
 import { parseWithGroq, isGroqAvailable } from "./parsers/groq.js";
+import { safeCorrectIndex } from "./parsers/answer-key.js";
 import { extractPdfPages } from "./parsers/pdf-extract.js";
 import { extractRawPdfPages } from "./parsers/pdf-raw.js";
 import { extractDocxPages } from "./parsers/docx-extract.js";
@@ -255,7 +256,12 @@ export function buildAdminRouter(storage) {
         subtopic: q.subtopic || undefined,
         text: q.text || "",
         options: Array.isArray(q.options) ? q.options.slice(0, 4) : ["", "", "", ""],
-        correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+        // Unset stays unset. Defaulting to 0 used to silently mark option A
+        // correct on every question saved without a key.
+        correctIndex: safeCorrectIndex(
+          q.correctIndex,
+          Array.isArray(q.options) ? q.options.length : 4
+        ),
         explanation: q.explanation || "",
         difficulty: q.difficulty || "Moderate",
         type: q.type || "MCQ",

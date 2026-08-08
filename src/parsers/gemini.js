@@ -4,6 +4,7 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import crypto from "crypto";
+import { normaliseCorrectIndex, extractInlineAnswer } from "./answer-key.js";
 
 const newId = () => "q_" + crypto.randomBytes(4).toString("hex");
 
@@ -61,7 +62,7 @@ const SYSTEM_PROMPT = `You are an expert at extracting multiple-choice questions
 Extract every question from the provided text. For each question return:
 - text: the full question stem (clean, no "Q1." prefix)
 - options: array of exactly 4 strings (A, B, C, D in order). If fewer are present, fill missing with empty strings.
-- correctIndex: 0-based index of the correct option. If unknown, return 0.
+- correctIndex: 0-based index of the correct option, taken ONLY from an answer key / marked answer / worked solution that is actually printed in the source. If the source does not state the answer, return null. NEVER guess, never solve the question yourself, and never default to 0 — a wrong answer is far worse than no answer.
 - explanation: solution text if present in the source, else empty string.
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics" (best guess from content).
 - topic: short topic name e.g. "Electrostatics", "Organic Chemistry", "Genetics". Empty if unsure.
@@ -71,7 +72,7 @@ Extract every question from the provided text. For each question return:
 - year: integer year if mentioned (e.g. PYQ 2022), else null.
 - Do not paraphrase, simplify, or rewrite notation. Preserve what is written in the source as closely as possible.
 
-ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if the paper does not print them, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from the answer key if known, else 0.
+ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if the paper does not print them, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from the printed answer key only, else null.
 - Preserve exact math notation. If you encounter corrupted fraction notation like '_{36}^x^2', 'x^2_36' or 'y^2_{16}' in the source, normalize it into correct LaTeX-style fraction form such as '\\frac{x^2}{36}' or '\\frac{y^2}{16}'.
 Return ONLY valid JSON of the shape: { "questions": [...] }
 No prose, no markdown fences.`;
@@ -305,7 +306,7 @@ For EACH question on the page return:
 - number: the question's PRINTED number exactly as shown (integer). This is critical for matching answers later.
 - text: full question stem, cleaned and preserved as written.
 - options: array of exactly 4 strings in A/B/C/D order. If fewer are present, fill missing with empty strings.
-- correctIndex: 0-based index of the correct option if it is marked/known on THIS page, else 0.
+- correctIndex: 0-based index of the correct option ONLY if the answer is actually marked / printed on THIS page (ticked, bold, circled, or given in a key or worked solution). Otherwise return null. NEVER solve the question yourself, never guess, and never default to 0 — leaving it null is correct and expected when the page does not show the answer.
 - explanation: solution text if visible on this page, else empty string.
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics".
 - topic: short chapter name.
@@ -315,7 +316,7 @@ For EACH question on the page return:
 - hasFigure: true if the question has/refers to a figure, diagram, graph, circuit, or image.
 - figureBox: if hasFigure is true, the tight bounding box of that figure as normalized page coordinates [x0, y0, x1, y1] where each value is between 0 and 1 (0,0 = top-left, 1,1 = bottom-right). If there is no figure, return null.
 
-ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if not printed, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from any answer key on the page, else 0.
+ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if not printed, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from an answer key printed on the page only, else null.
 
 ALSO, if this page contains an ANSWER KEY (e.g. "1. (c) 2. (b) ...") or a SOLUTIONS / EXPLANATIONS section, return them in an "answers" array. For each answer return:
 - number: the question number (integer).
@@ -362,10 +363,8 @@ export async function parseWithGeminiVision({ imageBuffer, mimeType, modelName, 
     ? parsed.answers
         .map((a) => ({
           number: Number.isInteger(a?.number) ? a.number : parseInt(a?.number, 10) || null,
-          correctIndex:
-            Number.isInteger(a?.correctIndex) && a.correctIndex >= 0 && a.correctIndex <= 3
-              ? a.correctIndex
-              : null,
+          // Accepts 0..3, "2", "B", "(b)", "Option C" — null when unusable.
+          correctIndex: normaliseCorrectIndex(a?.correctIndex),
           explanation: String(a?.explanation || "").trim(),
         }))
         .filter((a) => a.number != null)
@@ -410,6 +409,12 @@ function normalise(q, extras = {}) {
   const options = Array.isArray(q.options) ? q.options.slice(0, 4) : [];
   while (options.length < 4) options.push("");
 
+  // The answer comes from the model's key ONLY, or from a trailing "Ans: (C)"
+  // still sitting in the stem. If neither exists it stays null.
+  const modelIndex = normaliseCorrectIndex(q.correctIndex);
+  const rawText = String(q.text || "").trim();
+  const inline = modelIndex == null ? extractInlineAnswer(rawText) : null;
+
   const allowedSubjects = ["Physics", "Chemistry", "Biology", "Mathematics"];
   const allowedDifficulty = ["Easy", "Moderate", "Hard"];
   const allowedType = ["MCQ", "Assertion-Reason", "Case-Based"];
@@ -421,11 +426,10 @@ function normalise(q, extras = {}) {
 
   return {
     id: newId(),
-    text: String(q.text || "").trim(),
+    text: inline ? inline.cleanedText : rawText,
     options: options.map((o) => String(o || "").trim()),
-    correctIndex: Number.isInteger(q.correctIndex) && q.correctIndex >= 0 && q.correctIndex <= 3
-      ? q.correctIndex
-      : 0,
+    // null when the source never stated the answer. Never 0 — see answer-key.js.
+    correctIndex: modelIndex != null ? modelIndex : inline ? inline.index : null,
     explanation: String(q.explanation || "").trim(),
     subject: allowedSubjects.includes(q.subject) ? q.subject : "Physics",
     topic: String(q.topic || "").trim(),

@@ -11,6 +11,7 @@
 
 import Groq from "groq-sdk";
 import crypto from "crypto";
+import { normaliseCorrectIndex, extractInlineAnswer } from "./answer-key.js";
 
 const newId = () => "q_" + crypto.randomBytes(4).toString("hex");
 
@@ -32,7 +33,7 @@ Each question is on a specific page; use that to fill the "pageNumber" field.
 For EVERY question in the user's text, return one object with these fields:
 - text: full question stem, cleaned (no "Q1." / "1)" / "Question 1." prefixes). Keep ALL math, subscripts, labels.
 - options: array of EXACTLY 4 strings in order A, B, C, D. If fewer present, fill missing with "".
-- correctIndex: 0-based index of correct option. If unknown, use 0.
+- correctIndex: 0-based index of the correct option, taken ONLY from an answer key / marked answer / worked solution printed in the text. If the text does not state the answer, use null. NEVER guess, never solve the question yourself, and never default to 0 — null is the correct output when there is no key.
 - explanation: solution / answer key text if present, else "".
 - subject: one of "Physics" | "Chemistry" | "Biology" | "Mathematics" (best guess).
 - topic: short topic e.g. "Ray Optics", "Organic Chemistry", "Genetics". "" if unsure.
@@ -199,8 +200,13 @@ function normalise(q, pageImageBounds = null) {
     ? q.examType.filter((e) => allowedExam.includes(e))
     : [];
 
+  // Answer from the model's key only, or a trailing "Ans: (C)" left in the stem.
+  const modelIndex = normaliseCorrectIndex(q.correctIndex);
+  const rawText = String(q.text || "").trim();
+  const inline = modelIndex == null ? extractInlineAnswer(rawText) : null;
+
   // Heuristic figure detection as a safety net (Llama sometimes forgets the flag)
-  const text = String(q.text || "").trim();
+  const text = inline ? inline.cleanedText : rawText;
   const figureRe = /(shown in (the )?(figure|diagram|graph)|in the (figure|diagram|graph)|as shown|circuit (above|below|shown)|given (figure|diagram|graph)|adjoining figure|following figure)/i;
   const detectedFigure = figureRe.test(text);
 
@@ -208,10 +214,8 @@ function normalise(q, pageImageBounds = null) {
     id: newId(),
     text,
     options: options.map((o) => String(o || "").trim()),
-    correctIndex:
-      Number.isInteger(q.correctIndex) && q.correctIndex >= 0 && q.correctIndex <= 3
-        ? q.correctIndex
-        : 0,
+    // null when the source never stated the answer. Never 0 — see answer-key.js.
+    correctIndex: modelIndex != null ? modelIndex : inline ? inline.index : null,
     explanation: String(q.explanation || "").trim(),
     subject: allowedSubjects.includes(q.subject) ? q.subject : "Physics",
     topic: String(q.topic || "").trim(),
