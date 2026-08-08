@@ -737,6 +737,9 @@ export function buildAdminRouter(storage) {
 
       let questions = [];
       let parserUsed = "heuristic";
+      // Set when every Gemini key was rejected on auth, so the response can tell
+      // the admin the real cause instead of silently degrading to Groq.
+      let visionAuthFailed = false;
       // Vision context (populated by the AI Pro Max / vision path):
       //   visionAnswers   : questionNumber -> { correctIndex, explanation } from any answer key / solutions page
       //   visionPageBuffers: pageNumber -> rendered PNG buffer, used to crop out diagrams
@@ -885,6 +888,7 @@ export function buildAdminRouter(storage) {
                 // check, so pages skipped by the budget are never "started".
                 startPage(jobId, pageNumber);
                 let pageFailed = false;
+                let pageFailureReason = "";
                 let pngBuffer;
                 try {
                   const oneRendered = await renderPagesToPng(req.file.buffer, [pageNumber], VISION_RENDER_SCALE);
@@ -927,13 +931,21 @@ export function buildAdminRouter(storage) {
                   // Still failed after all retries — skip so one bad page can
                   // never stall the whole job.
                   pageFailed = true;
-                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped after retries: ${pageErr.message}`);
+                  pageFailureReason = pageErr?.message || String(pageErr);
+                  if (pageErr?.code === "GEMINI_AUTH_FAILED") visionAuthFailed = true;
+                  console.warn(`[parse-pdf] vision page ${pageNumber} skipped after retries: ${pageFailureReason}`);
                 }
                 // Exactly-once per processed page: settles success or readPage
-                // failure into a single completePage emit.
+                // failure into a single completePage emit. On failure carry the
+                // REAL reason so the admin sees "key rejected" instead of a
+                // bare warning badge with no explanation.
                 completePage(jobId, pageNumber, {
                   failed: pageFailed,
-                  note: getGeminiKeyLabel() ? `Running on ${getGeminiKeyLabel()}` : "Running on Gemini vision",
+                  note: pageFailed
+                    ? pageFailureReason
+                    : getGeminiKeyLabel()
+                      ? `Running on ${getGeminiKeyLabel()}`
+                      : "Running on Gemini vision",
                 });
                 processedPages++;
                 await sleep(150); // gentle rate smoothing to avoid 429 bursts
@@ -1387,12 +1399,22 @@ export function buildAdminRouter(storage) {
       // documentId to every returned question so the frontend can link them on Save All.
       const questionsOut = questions.map((q) => ({ ...cleanQuestionArtifacts(q), documentId }));
 
+      // A silent downgrade from AI Pro Max to Groq/heuristic left admins staring
+      // at empty results with no cause. If the Gemini keys were the reason, say
+      // it out loud in the response.
+      const parserWarning = visionAuthFailed
+        ? "AI Pro Max could not run: every Gemini API key was rejected (HTTP 401/403 — invalid or revoked). " +
+          "Generate a new key at https://aistudio.google.com/app/apikey and update GEMINI_API_KEY / GEMINI_API_KEYS " +
+          "in the server environment, then retry. Keys committed to a public repo are auto-revoked by Google."
+        : null;
+
       // Store the final result so the client can fetch it (the POST already
       // returned). Set BEFORE the terminal event fires so it's ready when the
       // client sees "complete"/"stopped".
       setJobResult(jobId, {
         documentId,
         parser: parserUsed,
+        parserWarning,
         pageCount,
         textLength: text.length,
         isScanned: false,
@@ -1421,6 +1443,7 @@ export function buildAdminRouter(storage) {
         res.json({
           documentId,
           parser: parserUsed,
+          parserWarning,
           pageCount,
           textLength: text.length,
           isScanned: false,

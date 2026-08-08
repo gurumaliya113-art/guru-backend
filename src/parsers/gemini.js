@@ -144,6 +144,13 @@ async function generateWithGeminiFallback({
   const candidates = getGeminiCandidates(primaryModel, preferredModel);
   const allKeys = getGeminiApiKeys();
   let lastError = null;
+  // Track auth rejections separately. A 401/403 on EVERY key means the keys are
+  // invalid/revoked (a leaked key auto-revoked by Google, or a stale value in
+  // the host's env) — not a transient outage. That deserves a blunt message
+  // instead of a generic "all fallback models failed", which sent admins
+  // hunting through parser code for a problem that is purely credentials.
+  let authFailures = 0;
+  let attempts = 0;
 
   // Google's free tier frequently returns 503 "high demand". These spikes are
   // transient, so we retry the whole model/key sweep a few times with growing
@@ -172,6 +179,7 @@ async function generateWithGeminiFallback({
     for (const modelName of candidates) {
       for (const apiKey of apiKeys) {
         const model = buildModel({ modelName, systemInstruction, responseMimeType, apiKey });
+        attempts++;
         try {
           const result = await model.generateContent(payload);
           if (kind === "vision") preferredVisionModel = modelName;
@@ -185,6 +193,8 @@ async function generateWithGeminiFallback({
           const httpStatus = extractHttpStatus(err);
           lastError = err;
           if (httpStatus === 401 || httpStatus === 403) {
+            authFailures++;
+            console.warn(`[Gemini Parser] key ${String(apiKey).slice(0, 8)}… rejected with ${httpStatus} (invalid / revoked key)`);
             continue;
           }
           if (!isRetryableGeminiError(httpStatus)) {
@@ -203,6 +213,18 @@ async function generateWithGeminiFallback({
     backoffNext = sawOverload;
     // If nothing was retryable (e.g. all auth failures), don't keep looping.
     if (!sawRetryable) break;
+  }
+
+  // Every single attempt was rejected on authentication => the keys themselves
+  // are the problem. Say so plainly, and mark it so callers can surface it.
+  if (attempts > 0 && authFailures === attempts) {
+    const err = new Error(
+      `All ${allKeys.length} Gemini API key(s) were rejected (HTTP 401/403 — invalid or revoked). ` +
+        `Generate a new key at https://aistudio.google.com/app/apikey and update GEMINI_API_KEY / GEMINI_API_KEYS ` +
+        `in the server environment. Note: keys committed to a public repo are auto-revoked by Google.`
+    );
+    err.code = "GEMINI_AUTH_FAILED";
+    throw err;
   }
 
   throw lastError || new Error("Gemini API error: all fallback models failed.");
