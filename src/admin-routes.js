@@ -86,17 +86,20 @@ const PARSE_TIME_BUDGET_MS = Number(process.env.PARSE_TIME_BUDGET_MS || 45000);
  * return a PNG buffer of just that region (with a little padding). Used to
  * pull individual diagrams out of a rendered scanned page.
  */
-async function cropRegionToPng(pngBuffer, box, pad = 0.02) {
+async function cropRegionToPng(pngBuffer, box, padX = 0.012, padY = 0.004) {
   try {
     const img = await loadImage(pngBuffer);
     const W = img.width;
     const H = img.height;
     let [x0, y0, x1, y1] = box;
-    // add padding
-    x0 = Math.max(0, x0 - pad);
-    y0 = Math.max(0, y0 - pad);
-    x1 = Math.min(1, x1 + pad);
-    y1 = Math.min(1, y1 + pad);
+    // Asymmetric padding: a little horizontal room so panel labels like
+    // (a)/(b)/(c)/(d) and axis labels aren't clipped, but almost no vertical
+    // padding so the neighbouring question/caption text lines don't bleed into
+    // the cropped diagram (that was the "text above & below" margin issue).
+    x0 = Math.max(0, x0 - padX);
+    y0 = Math.max(0, y0 - padY);
+    x1 = Math.min(1, x1 + padX);
+    y1 = Math.min(1, y1 + padY);
     const sx = Math.floor(x0 * W);
     const sy = Math.floor(y0 * H);
     const sw = Math.max(1, Math.ceil((x1 - x0) * W));

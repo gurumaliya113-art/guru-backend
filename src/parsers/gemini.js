@@ -387,7 +387,12 @@ For EACH question on the page return:
 - type: "MCQ" | "Assertion-Reason" | "Case-Based".
 - examType: array containing one or more of "NEET", "JEE", "BOARD".
 - hasFigure: true if the question has/refers to a figure, diagram, graph, circuit, or image.
-- figureBox: if hasFigure is true, the tight bounding box of that figure as normalized page coordinates [x0, y0, x1, y1] where each value is between 0 and 1 (0,0 = top-left, 1,1 = bottom-right). If there is no figure, return null.
+- figureBox: if hasFigure is true, the TIGHT bounding box of ONLY the figure graphics as normalized page coordinates [x0, y0, x1, y1] where each value is between 0 and 1 (0,0 = top-left, 1,1 = bottom-right). If there is no figure, return null.
+  CRITICAL for figureBox tightness — the box must hug the diagram pixels only:
+  * y0 (top edge) must start right at the top of the drawing, NOT on the question-stem text line above it. Leave the printed sentence above the figure OUTSIDE the box.
+  * y1 (bottom edge) must end right at the bottom of the drawing, NOT on the next question/caption text line below it. Leave the sentence below the figure OUTSIDE the box.
+  * Include axis labels and panel letters like (a)(b)(c)(d) that are part of the diagram, but do NOT include full sentences of body text.
+  * When several option diagrams (a),(b),(c),(d) belong to one question, use ONE box that spans all the panels horizontally but stays tight top-and-bottom around just those drawings.
 
 ASSERTION-REASON questions (IMPORTANT — do NOT skip these): When a question is in the "Assertion (A) / Reason (R)" format, you MUST still extract it. Set type to "Assertion-Reason". Put BOTH statements in "text" on separate lines, e.g. "Assertion (A): <full assertion>\\nReason (R): <full reason>". Use the four options exactly as printed; if not printed, use the standard set: ["Both A and R are true and R is the correct explanation of A","Both A and R are true but R is NOT the correct explanation of A","A is true but R is false","A is false but R is true"]. Set correctIndex from an answer key printed on the page only, else null.
 
